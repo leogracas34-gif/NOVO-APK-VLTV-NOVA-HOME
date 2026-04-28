@@ -1,0 +1,469 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- Fundo com imagem (fullscreen como na TV) -->
+    <ImageView
+        android:id="@+id/imgBackground"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="centerCrop"
+        android:alpha="0.7"
+        android:visibility="visible" />
+
+    <!-- Gradiente overlay -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/gradient_overlay" />
+
+    <!-- Scroll principal -->
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:paddingBottom="80dp">
+
+            <!-- ===== BLOCO SUPERIOR: Poster + Infos ===== -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <!-- Poster (ID da TV) -->
+                <ImageView
+                    android:id="@+id/imgPoster"
+                    android:layout_width="200dp"
+                    android:layout_height="300dp"
+                    android:scaleType="centerCrop"
+                    android:background="#333333"
+                    android:elevation="8dp"
+                    android:focusable="true"
+                    android:focusableInTouchMode="false"
+                    android:nextFocusDown="@id/btnPlay"
+                    android:nextFocusRight="@id/imgTitleLogo" />
+
+                <!-- Coluna direita: título + infos -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="24dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <!-- Logo do título (ID do celular) -->
+                    <ImageView
+                        android:id="@+id/imgTitleLogo"
+                        android:layout_width="match_parent"
+                        android:layout_height="100dp"
+                        android:layout_marginBottom="8dp"
+                        android:scaleType="fitStart"
+                        android:visibility="gone" />
+
+                    <!-- Título (ID da TV) -->
+                    <TextView
+                        android:id="@+id/tvTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Carregando..."
+                        android:textColor="#FFFFFF"
+                        android:textSize="24sp"
+                        android:textStyle="bold" />
+
+                    <!-- Nota + Ano -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
+                        <TextView
+                            android:id="@+id/tvRating"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:background="#FFC107"
+                            android:paddingHorizontal="8dp"
+                            android:paddingVertical="4dp"
+                            android:text="Nota: --"
+                            android:textColor="#000000"
+                            android:textStyle="bold"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tvYear"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:text="2024"
+                            android:textColor="#BBBBBB"
+                            android:textSize="14sp" />
+
+                    </LinearLayout>
+
+                    <!-- Gênero (ID da TV) -->
+                    <TextView
+                        android:id="@+id/tvGenre"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="Gênero: ..."
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp" />
+
+                    <!-- Elenco (ID da TV) -->
+                    <TextView
+                        android:id="@+id/tvCast"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="Elenco:"
+                        android:textColor="#DDDDDD"
+                        android:textSize="14sp"
+                        android:lineSpacingExtra="3dp"
+                        android:minLines="3"
+                        android:maxLines="4"
+                        android:ellipsize="end" />
+
+                    <!-- RecyclerView elenco (ID da TV, oculto) -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recyclerCast"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:visibility="gone"
+                        android:layout_marginTop="10dp"
+                        android:layout_marginBottom="10dp"
+                        android:orientation="horizontal"
+                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+
+                    <!-- Sinopse label -->
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="SINOPSE"
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <!-- Sinopse (ID do celular: tvPlot) -->
+                    <TextView
+                        android:id="@+id/tvPlot"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:lineSpacingExtra="4dp"
+                        android:text="..."
+                        android:textColor="#FFFFFF"
+                        android:textSize="15sp"
+                        android:maxLines="5"
+                        android:ellipsize="end" />
+
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ===== BARRA DE PROGRESSO (ID do celular) ===== -->
+            <LinearLayout
+                android:id="@+id/layoutProgress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="16dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <ProgressBar
+                        android:id="@+id/progressBarMovie"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="0dp"
+                        android:layout_height="4dp"
+                        android:layout_weight="1"
+                        android:progressDrawable="@drawable/progress_horizontal_disney" />
+
+                    <TextView
+                        android:id="@+id/tvTimeRemaining"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="Restam 0h0min"
+                        android:textColor="#BBBBBB"
+                        android:textSize="10sp" />
+
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ===== BOTÕES DE AÇÃO ===== -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="20dp">
+
+                <!-- Botão Continuar (ID da TV) -->
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnResume"
+                    android:layout_width="180dp"
+                    android:layout_height="50dp"
+                    android:layout_marginBottom="10dp"
+                    android:background="@drawable/bg_btn_grey"
+                    android:text="CONTINUAR"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:visibility="gone"
+                    android:focusable="true"
+                    android:focusableInTouchMode="false"
+                    android:nextFocusUp="@id/imgPoster"
+                    android:nextFocusDown="@id/btnPlay" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <!-- Botão Assistir (ID da TV) -->
+                    <androidx.appcompat.widget.AppCompatButton
+                        android:id="@+id/btnPlay"
+                        android:layout_width="180dp"
+                        android:layout_height="50dp"
+                        android:background="@drawable/bg_btn_white"
+                        android:text="▶  ASSISTIR"
+                        android:textColor="#000000"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:focusable="true"
+                        android:focusableInTouchMode="false"
+                        android:nextFocusUp="@id/btnResume"
+                        android:nextFocusRight="@id/btnFavorite"
+                        android:nextFocusDown="@id/recyclerSuggestions" />
+
+                    <!-- Botão Favorito (ID da TV) -->
+                    <ImageButton
+                        android:id="@+id/btnFavorite"
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:layout_marginStart="15dp"
+                        android:src="@android:drawable/btn_star_big_off"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:focusable="true"
+                        android:focusableInTouchMode="false"
+                        android:nextFocusLeft="@id/btnPlay"
+                        android:nextFocusRight="@id/btnRestartAction"
+                        android:nextFocusDown="@id/recyclerSuggestions"
+                        app:tint="#FFFFFF" />
+
+                    <!-- Botão Reiniciar (ID do celular) -->
+                    <LinearLayout
+                        android:id="@+id/btnRestartAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="15dp"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:focusableInTouchMode="false"
+                        android:visibility="gone"
+                        android:nextFocusLeft="@id/btnFavorite"
+                        android:nextFocusRight="@id/btnDownloadAction"
+                        android:nextFocusDown="@id/recyclerSuggestions">
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@android:drawable/ic_menu_rotate" />
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="REINICIAR"
+                            android:textColor="#FFFFFF"
+                            android:textSize="9sp"
+                            android:layout_marginTop="4dp" />
+                    </LinearLayout>
+
+                    <!-- Botão Download (ID do celular) -->
+                    <LinearLayout
+                        android:id="@+id/btnDownloadAction"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="15dp"
+                        android:gravity="center"
+                        android:orientation="vertical"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:focusableInTouchMode="false"
+                        android:nextFocusLeft="@id/btnRestartAction"
+                        android:nextFocusDown="@id/recyclerSuggestions">
+                        <ImageView
+                            android:id="@+id/imgDownloadState"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_details_download" />
+                        <TextView
+                            android:id="@+id/tvDownloadState"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="BAIXAR"
+                            android:textColor="#FFFFFF"
+                            android:textSize="9sp"
+                            android:layout_marginTop="4dp" />
+                    </LinearLayout>
+
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ===== TABS: Sugestões / Extras / Detalhes ===== -->
+            <com.google.android.material.tabs.TabLayout
+                android:id="@+id/tabLayoutDetails"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:background="#000000"
+                app:tabIndicator="@drawable/custom_tab_indicator"
+                app:tabIndicatorColor="#FFFFFF"
+                app:tabIndicatorGravity="bottom"
+                app:tabIndicatorHeight="2dp"
+                app:tabSelectedTextColor="#FFFFFF"
+                app:tabTextColor="#88FFFFFF"
+                app:tabMode="fixed">
+                <com.google.android.material.tabs.TabItem android:text="SUGESTÕES" />
+                <com.google.android.material.tabs.TabItem android:text="EXTRAS" />
+                <com.google.android.material.tabs.TabItem android:text="DETALHES" />
+            </com.google.android.material.tabs.TabLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#33FFFFFF" />
+
+            <!-- ===== CONTEÚDO DAS TABS ===== -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="10dp">
+
+                <!-- Sugestões (ID do celular) -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerSuggestions"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:focusable="true"
+                    android:focusableInTouchMode="false"
+                    android:descendantFocusability="afterDescendants"
+                    android:nextFocusUp="@id/btnPlay"
+                    android:nextFocusDown="@id/recyclerEpisodes"
+                    android:visibility="visible" />
+
+                <!-- Episódios (ID da TV) -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerEpisodes"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:focusable="true"
+                    android:focusableInTouchMode="false"
+                    android:descendantFocusability="afterDescendants"
+                    android:nextFocusUp="@id/btnPlay"
+                    android:nestedScrollingEnabled="false"
+                    android:visibility="gone" />
+
+                <!-- Aba Detalhes (ID do celular) -->
+                <LinearLayout
+                    android:id="@+id/layoutTabDetails"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="20dp"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tvDetailFullTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="#FFFFFF"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="8dp" />
+
+                    <TextView
+                        android:id="@+id/tvDetailFullPlot"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:textColor="#BBBBBB"
+                        android:textSize="13sp"
+                        android:layout_marginBottom="16dp" />
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Duração:" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="12sp" />
+                    <TextView android:id="@+id/tvDetailDuration" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#BBBBBB" android:textSize="12sp" android:layout_marginBottom="8dp" />
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Data de lançamento:" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="12sp" />
+                    <TextView android:id="@+id/tvDetailReleaseDate" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#BBBBBB" android:textSize="12sp" android:layout_marginBottom="8dp" />
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Gênero:" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="12sp" />
+                    <TextView android:id="@+id/tvDetailGenre" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#BBBBBB" android:textSize="12sp" android:layout_marginBottom="16dp" />
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Disponível nos seguintes formatos:" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="12sp" />
+                    <com.google.android.flexbox.FlexboxLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:layout_marginBottom="16dp"
+                        app:flexWrap="wrap">
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="IMAX ENHANCED" android:background="@drawable/bg_format_tag" android:textColor="#FFFFFF" android:textSize="10sp" android:textStyle="bold" android:layout_margin="2dp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="4K ULTRA HD" android:background="@drawable/bg_format_tag" android:textColor="#FFFFFF" android:textSize="10sp" android:textStyle="bold" android:layout_margin="2dp" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="5.1" android:background="@drawable/bg_format_tag" android:textColor="#FFFFFF" android:textSize="10sp" android:textStyle="bold" android:layout_margin="2dp" />
+                    </com.google.android.flexbox.FlexboxLayout>
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Direção:" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="12sp" />
+                    <TextView android:id="@+id/tvDetailDirector" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#BBBBBB" android:textSize="12sp" android:layout_marginBottom="8dp" />
+
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Elenco:" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="12sp" />
+                    <TextView android:id="@+id/tvCastDetail" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="#BBBBBB" android:textSize="12sp" />
+
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- ===== TÍTULO EPISÓDIOS (ID da TV) ===== -->
+            <TextView
+                android:id="@+id/tvEpisodesTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:text="📺 EPISÓDIOS"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <!-- IDs ocultos preservados da TV/celular para não quebrar o Kotlin -->
+            <Button android:id="@+id/btnSettings" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
+            <LinearLayout android:id="@+id/btnDownloadArea" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" android:orientation="horizontal"/>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- Botão fechar (ID do celular) -->
+    <ImageButton
+        android:id="@+id/btnClose"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_margin="16dp"
+        android:visibility="gone"
+        android:background="@drawable/bg_circle_dark"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        app:tint="#FFFFFF" />
+
+</FrameLayout>
