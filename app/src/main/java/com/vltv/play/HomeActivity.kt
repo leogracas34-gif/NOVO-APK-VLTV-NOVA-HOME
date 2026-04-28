@@ -729,9 +729,18 @@ class HomeActivity : AppCompatActivity() {
             .setTitle("Sair")
             .setMessage("Deseja realmente sair e desconectar?")
             .setPositiveButton("Sim") { _, _ ->
-                val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-                prefs.edit().clear().apply()
 
+                // ✅ Limpa TODAS as SharedPreferences do app
+                // Isso garante que last_profile_name não sobrevive ao logout
+                getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE).edit().clear().apply()
+                getSharedPreferences("vltv_home_prefs", Context.MODE_PRIVATE).edit().clear().apply()
+                getSharedPreferences("vltv_favoritos", Context.MODE_PRIVATE).edit().clear().apply()
+                getSharedPreferences("vltv_logos_cache", Context.MODE_PRIVATE).edit().clear().apply()
+                getSharedPreferences("vltv_text_cache", Context.MODE_PRIVATE).edit().clear().apply()
+
+                // ✅ Vai direto para o Login limpando toda a pilha de telas
+                // Com as prefs limpas, LoginActivity não vai fazer auto-login
+                // e ProfilesActivity não vai fazer auto-navegação para a Home
                 val intent = Intent(this, LoginActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 startActivity(intent)
@@ -904,6 +913,8 @@ class HomeActivity : AppCompatActivity() {
             private val tvTitle: TextView = itemView.findViewById(R.id.tvBannerTitle)
             private val imgLogo: ImageView = itemView.findViewById(R.id.imgBannerLogo)
             private val btnPlay: View = itemView.findViewById(R.id.btnBannerPlay)
+            // ✅ Novo botão Detalhes do banner premium
+            private val btnInfo: View? = try { itemView.findViewById(R.id.btnBannerInfo) } catch (e: Exception) { null }
 
             fun bind(item: Any) {
                 var title = ""
@@ -937,6 +948,7 @@ class HomeActivity : AppCompatActivity() {
 
                 buscarImagemBackgroundTMDB(limparNomeParaTMDB(title), isSeries, icon, id, imgBanner, imgLogo, tvTitle, suave = true)
 
+                // ✅ Abre o player diretamente
                 btnPlay.setOnClickListener {
                     val intent = if (isSeries) Intent(this@HomeActivity, SeriesDetailsActivity::class.java).apply { putExtra("series_id", id) }
                                  else Intent(this@HomeActivity, DetailsActivity::class.java).apply { putExtra("stream_id", id) }
@@ -946,6 +958,18 @@ class HomeActivity : AppCompatActivity() {
                     intent.putExtra("is_series", isSeries)
                     startActivity(intent)
                 }
+
+                // ✅ Botão Detalhes — abre a tela de detalhes (sem iniciar o player)
+                btnInfo?.setOnClickListener {
+                    val intent = if (isSeries) Intent(this@HomeActivity, SeriesDetailsActivity::class.java).apply { putExtra("series_id", id) }
+                                 else Intent(this@HomeActivity, DetailsActivity::class.java).apply { putExtra("stream_id", id) }
+                    intent.putExtra("name", title)
+                    intent.putExtra("icon", icon)
+                    intent.putExtra("PROFILE_NAME", currentProfile)
+                    intent.putExtra("is_series", isSeries)
+                    startActivity(intent)
+                }
+
                 itemView.setOnClickListener { btnPlay.performClick() }
             }
         }
