@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "134015828481",
+    "project_id": "vltv-f7b43",
+    "storage_bucket": "vltv-f7b43.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:134015828481:android:43cb3d5b7f4b622aa1f600",
+        "android_client_info": {
+          "package_name": "com.vltv.play"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyClwVvHThXajfKiJxKenw00KpZ9nnT-k2A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
