@@ -1,107 +1,171 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#070710">
 
-    <androidx.cardview.widget.CardView
-        android:id="@+id/cardBannerRoot"
+    <!-- Imagem de fundo full-screen -->
+    <ImageView
+        android:id="@+id/imgBanner"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        app:cardCornerRadius="12dp"
-        app:cardElevation="4dp"
-        app:cardBackgroundColor="#202020"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        android:scaleType="centerCrop"
+        android:contentDescription="Banner"/>
 
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
+    <!-- Gradiente escuro em cima da imagem — de cima para baixo e lateral -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_banner_scrim"/>
 
-            <ImageView
-                android:id="@+id/imgBanner"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:src="@drawable/ic_launcher_background" />
+    <!-- Conteúdo sobreposto ao banner -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="bottom"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="28dp">
 
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:background="@drawable/gradient_black_bottom" />
+        <!-- Logo do título (quando disponível via TMDB) -->
+        <ImageView
+            android:id="@+id/imgBannerLogo"
+            android:layout_width="220dp"
+            android:layout_height="80dp"
+            android:scaleType="fitStart"
+            android:adjustViewBounds="true"
+            android:visibility="gone"
+            android:contentDescription="Logo do título"/>
 
-            <LinearLayout
-                android:layout_width="match_parent"
+        <!-- Título texto (fallback quando não tem logo) -->
+        <TextView
+            android:id="@+id/tvBannerTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textColor="#FFFFFF"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-condensed"
+            android:maxLines="2"
+            android:shadowColor="#CC000000"
+            android:shadowRadius="8"
+            android:shadowDx="0"
+            android:shadowDy="2"/>
+
+        <!-- Tags de gênero/qualidade -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="bottom"
-                android:orientation="vertical"
-                android:padding="16dp">
+                android:text="HD"
+                android:textColor="#FFFFFF"
+                android:textSize="9sp"
+                android:textStyle="bold"
+                android:background="@drawable/bg_tag_hd"
+                android:paddingHorizontal="6dp"
+                android:paddingVertical="2dp"
+                android:layout_marginEnd="6dp"/>
 
-                <ImageView
-                    android:id="@+id/imgBannerLogo"
-                    android:layout_width="150dp"
-                    android:layout_height="60dp"
-                    android:scaleType="fitStart"
-                    android:visibility="gone"
-                    android:layout_marginBottom="8dp"/>
+            <TextView
+                android:id="@+id/tvBannerGenre"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="• Em Destaque"
+                android:textColor="#CCFFFFFF"
+                android:textSize="11sp"
+                android:fontFamily="sans-serif"/>
 
-                <TextView
-                    android:id="@+id/tvBannerTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Título do Filme"
-                    android:textColor="#FFFFFF"
-                    android:textSize="22sp"
-                    android:textStyle="bold"
-                    android:shadowColor="#000000"
-                    android:shadowRadius="4"
-                    android:maxLines="2"
-                    android:ellipsize="end" />
+        </LinearLayout>
 
-                <TextView
-                    android:id="@+id/tvBannerGenres"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Ação • Aventura • 2024"
-                    android:textColor="#CCCCCC"
-                    android:textSize="12sp"
-                    android:layout_marginTop="4dp"
-                    android:layout_marginBottom="12dp"/>
+        <!-- Botões de ação -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="16dp"
+            android:gravity="start">
 
+            <!-- Botão ASSISTIR (estilo Netflix branco sólido) -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/btnBannerPlay"
+                android:layout_width="wrap_content"
+                android:layout_height="42dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardCornerRadius="6dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="#FFFFFF"
+                xmlns:app="http://schemas.android.com/apk/res-auto">
                 <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:paddingHorizontal="18dp">
                     <TextView
-                        android:id="@+id/btnBannerPlay"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/bg_search_rounded"
-                        android:backgroundTint="#FFFFFF"
-                        android:text="▶ Assistir"
+                        android:text="▶"
                         android:textColor="#000000"
+                        android:textSize="12sp"
+                        android:layout_marginEnd="6dp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ASSISTIR"
+                        android:textColor="#000000"
+                        android:textSize="12sp"
                         android:textStyle="bold"
-                        android:paddingHorizontal="24dp"
-                        android:paddingVertical="10dp"
-                        android:gravity="center"
-                        android:layout_marginEnd="12dp"/>
-                        
-                    <ImageButton
-                        android:id="@+id/btnAddList"
-                        android:layout_width="40dp"
-                        android:layout_height="40dp"
-                        android:visibility="gone"
-                        android:background="@drawable/bg_search_rounded"
-                        android:backgroundTint="#404040"
-                        android:src="@drawable/ic_add"
-                        app:tint="#FFFFFF"
-                        android:layout_gravity="center_vertical"/>
+                        android:letterSpacing="0.05"/>
                 </LinearLayout>
-            </LinearLayout>
-        </FrameLayout>
-    </androidx.cardview.widget.CardView>
+            </androidx.cardview.widget.CardView>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+            <!-- Botão MAIS INFORMAÇÕES (estilo HBO Max semi-transparente) -->
+            <androidx.cardview.widget.CardView
+                android:id="@+id/btnBannerInfo"
+                android:layout_width="wrap_content"
+                android:layout_height="42dp"
+                android:layout_marginStart="10dp"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardCornerRadius="6dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="#55FFFFFF"
+                xmlns:app="http://schemas.android.com/apk/res-auto">
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:paddingHorizontal="16dp">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ⓘ"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13sp"
+                        android:layout_marginEnd="6dp"/>
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="DETALHES"
+                        android:textColor="#FFFFFF"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.05"/>
+                </LinearLayout>
+            </androidx.cardview.widget.CardView>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</FrameLayout>
