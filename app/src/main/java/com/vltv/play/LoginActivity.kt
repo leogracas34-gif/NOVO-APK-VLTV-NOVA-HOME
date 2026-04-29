@@ -44,14 +44,20 @@ class LoginActivity : AppCompatActivity() {
         "http://cmdtv.pro",
         "http://cmdtv.sbs",
         "http://cmdtv.top",
+        "http://tlfp.fun:80",
+        "http://telefunplay.xyz:80",
+        "http://ouropreto.top",
         "http://cmdbr.life",
         "http://blackdeluxe.shop"
     )
 
+    // ✅ FIX #1: Timeout aumentado — 5s era curto demais para servidores lentos
+    // connectTimeout: tempo para estabelecer a conexão TCP
+    // readTimeout: tempo para receber a resposta depois de conectado
     private val client = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(false)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)   // ✅ FIX: tenta reconectar automaticamente
         .build()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,10 +72,9 @@ class LoginActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         val savedUser = prefs.getString("username", null)
         val savedPass = prefs.getString("password", null)
-        val savedDns = prefs.getString("dns", null)
+        val savedDns  = prefs.getString("dns", null)
 
         if (!savedUser.isNullOrBlank() && !savedPass.isNullOrBlank() && !savedDns.isNullOrBlank()) {
-            // âœ… AUTO-LOGIN: vai imediatamente, sem esperar carregamento
             verificarEIniciarRapido(savedDns, savedUser, savedPass)
         } else {
             binding = ActivityLoginBinding.inflate(layoutInflater)
@@ -94,6 +99,12 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
+        // ✅ FIX DUPLO CLIQUE: focusableInTouchMode no botão fazia o 1º toque
+        // apenas ganhar foco e o 2º disparar o clique. Forçamos false aqui por
+        // código para garantir, independente do que estiver no XML.
+        binding.btnLogin.isFocusableInTouchMode = false
+        binding.btnLogin.isFocusable = false
+
         binding.etUsername.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_NEXT) {
                 binding.etPassword.requestFocus()
@@ -103,17 +114,23 @@ class LoginActivity : AppCompatActivity() {
 
         binding.etPassword.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_GO) {
-                binding.btnLogin.performClick()
+                binding.btnLogin.callOnClick()
                 true
             } else false
         }
 
+        // ✅ Debounce 800ms: evita duplo disparo mesmo que o usuário toque rápido
+        var ultimoClique = 0L
         binding.btnLogin.setOnClickListener {
+            val agora = System.currentTimeMillis()
+            if (agora - ultimoClique < 800L) return@setOnClickListener
+            ultimoClique = agora
+
             val user = binding.etUsername.text.toString().trim()
             val pass = binding.etPassword.text.toString().trim()
 
             if (user.isEmpty() || pass.isEmpty()) {
-                Toast.makeText(this, "Preencha usuÃ¡rio e senha!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Preencha usuário e senha!", Toast.LENGTH_SHORT).show()
             } else {
                 iniciarLoginTurbo(user, pass)
             }
@@ -122,8 +139,6 @@ class LoginActivity : AppCompatActivity() {
         binding.etUsername.requestFocus()
     }
 
-    // âœ… AUTO-LOGIN RÃPIDO: navega imediatamente se jÃ¡ tem dados no banco.
-    // O conteÃºdo novo do servidor Ã© sincronizado pelo HomeActivity em background.
     private fun verificarEIniciarRapido(dns: String, user: String, pass: String) {
         lifecycleScope.launch(Dispatchers.IO) {
             val db = AppDatabase.getDatabase(applicationContext)
@@ -131,21 +146,14 @@ class LoginActivity : AppCompatActivity() {
 
             withContext(Dispatchers.Main) {
                 if (temConteudo) {
-                    // âœ… TEM CONTEÃšDO: vai direto sem mostrar loading nem esperar API
                     decidirProximaTela()
                 } else {
-                    // Primeiro uso: precisa carregar pelo menos um lote inicial
                     binding = ActivityLoginBinding.inflate(layoutInflater)
                     setContentView(binding.root)
                     aplicarModoImersivo()
                     binding.progressBar.visibility = View.VISIBLE
-                    Toast.makeText(
-                        this@LoginActivity,
-                        "Primeiro acesso, carregando...",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this@LoginActivity, "Primeiro acesso, carregando...", Toast.LENGTH_SHORT).show()
 
-                    // Carrega um lote mÃ­nimo e navega logo apÃ³s
                     launch(Dispatchers.IO) {
                         preCarregarLoteMinimo(dns, user, pass)
                         withContext(Dispatchers.Main) { decidirProximaTela() }
@@ -162,118 +170,129 @@ class LoginActivity : AppCompatActivity() {
         binding.etPassword.isEnabled = false
 
         lifecycleScope.launch(Dispatchers.IO) {
+
+            // ✅ FIX #2: Usar select{} para pegar o PRIMEIRO servidor que responder
+            // Antes: loop de polling a cada 100ms com race condition
+            // Agora: cada servidor corre em paralelo e o vencedor cancela os demais imediatamente
+            var dnsVencedor: String? = null
+
             try {
-                val deferreds = SERVERS.map { url ->
-                    async { testarConexaoIndividual(url, user, pass) }
-                }
+                dnsVencedor = withTimeoutOrNull(15_000L) {
+                    // Canal de capacidade 1: só o primeiro resultado importa
+                    val canal = kotlinx.coroutines.channels.Channel<String>(1)
 
-                var dnsVencedor: String? = null
-                val startTime = System.currentTimeMillis()
-
-                while (System.currentTimeMillis() - startTime < 10000) {
-                    val completed = deferreds.filter { it.isCompleted }
-                    for (job in completed) {
-                        val result = job.getCompleted()
-                        if (result != null) {
-                            dnsVencedor = result
-                            break
+                    val jobs = SERVERS.map { url ->
+                        launch(Dispatchers.IO) {
+                            val resultado = testarConexaoIndividual(url, user, pass)
+                            if (resultado != null) {
+                                canal.trySend(resultado)
+                            }
                         }
                     }
-                    if (dnsVencedor != null) break
-                    delay(100)
+
+                    // Aguarda o primeiro resultado ou timeout
+                    val vencedor = canal.receive()
+                    jobs.forEach { it.cancel() }  // cancela os demais imediatamente
+                    canal.close()
+                    vencedor
                 }
-
-                deferreds.forEach { if (it.isActive) it.cancel() }
-
-                if (dnsVencedor != null) {
-                    // âœ… SEPARAÃ‡ÃƒO DE USUÃRIOS: Detecta se o usuÃ¡rio mudou e limpa o banco
-                    val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-                    val usuarioAnterior = prefs.getString("username", null)
-
-                    if (usuarioAnterior != null && usuarioAnterior != user) {
-                        // UsuÃ¡rio diferente: limpa todo o conteÃºdo do banco
-                        limparBancoPorTrocaDeUsuario()
-                    }
-
-                    salvarCredenciais(dnsVencedor, user, pass)
-
-                    withContext(Dispatchers.Main) {
-                        Toast.makeText(this@LoginActivity, "Conectando Ã  VLTV+", Toast.LENGTH_LONG).show()
-                    }
-
-                    // âœ… RÃPIDO: carrega sÃ³ um lote mÃ­nimo e navega logo
-                    preCarregarLoteMinimo(dnsVencedor, user, pass)
-                    withContext(Dispatchers.Main) { decidirProximaTela() }
-
-                } else {
-                    withContext(Dispatchers.Main) {
-                        mostrarErro("Nenhum servidor respondeu. Verifique dados.")
-                    }
-                }
-
             } catch (e: Exception) {
+                // timeout ou falha geral
+            }
+
+            if (dnsVencedor != null) {
+                val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+                val usuarioAnterior = prefs.getString("username", null)
+
+                if (usuarioAnterior != null && usuarioAnterior != user) {
+                    limparBancoPorTrocaDeUsuario()
+                }
+
+                salvarCredenciais(dnsVencedor, user, pass)
+
                 withContext(Dispatchers.Main) {
-                    mostrarErro("Erro: ${e.message}")
+                    Toast.makeText(this@LoginActivity, "Conectando à VLTV+", Toast.LENGTH_SHORT).show()
+                }
+
+                // ✅ FIX #3: Pré-carregamento paralelo (filmes + séries ao mesmo tempo)
+                // Antes: sequencial — filmes primeiro, depois séries (~2x mais lento)
+                // Agora: ambos em paralelo com coroutineScope
+                preCarregarLoteMinimo(dnsVencedor, user, pass)
+                withContext(Dispatchers.Main) { decidirProximaTela() }
+
+            } else {
+                withContext(Dispatchers.Main) {
+                    mostrarErro("Nenhum servidor respondeu. Verifique login e senha.")
                 }
             }
         }
     }
 
-    // âœ… LOTE MÃNIMO: carrega apenas 20 itens de cada para abrir a tela rÃ¡pido.
-    // O restante Ã© sincronizado silenciosamente pelo HomeActivity.
+    // ✅ FIX #4: Pré-carrega filmes E séries em paralelo (coroutineScope = aguarda ambos)
+    // Reduzido de 20 para 10 itens cada — suficiente para a tela não aparecer vazia,
+    // mas 2x mais rápido. O restante é sincronizado pelo HomeActivity em background.
     private suspend fun preCarregarLoteMinimo(dns: String, user: String, pass: String) {
         try {
             val db = AppDatabase.getDatabase(this)
             val base = normalizarBaseUrl(dns)
 
-            // FILMES â€” apenas 20
-            try {
-                val vodUrl = "${base}player_api.php?username=$user&password=$pass&action=get_vod_streams"
-                val response = URL(vodUrl).readText()
-                val jsonArray = JSONArray(response)
-                val batch = mutableListOf<VodEntity>()
-                val limit = minOf(20, jsonArray.length())
+            coroutineScope {
+                // Filmes e séries baixam ao mesmo tempo
+                val jobFilmes = async(Dispatchers.IO) {
+                    try {
+                        val vodUrl = "${base}player_api.php?username=$user&password=$pass&action=get_vod_streams"
+                        val response = URL(vodUrl).readText()
+                        val jsonArray = JSONArray(response)
+                        val batch = mutableListOf<VodEntity>()
+                        val limit = minOf(10, jsonArray.length()) // ✅ 10 itens (era 20)
 
-                for (i in 0 until limit) {
-                    val obj = jsonArray.getJSONObject(i)
-                    batch.add(VodEntity(
-                        stream_id = obj.optInt("stream_id"),
-                        name = obj.optString("name"),
-                        title = obj.optString("name"),
-                        stream_icon = obj.optString("stream_icon"),
-                        container_extension = obj.optString("container_extension"),
-                        rating = obj.optString("rating"),
-                        category_id = obj.optString("category_id"),
-                        added = obj.optLong("added")
-                    ))
+                        for (i in 0 until limit) {
+                            val obj = jsonArray.getJSONObject(i)
+                            batch.add(VodEntity(
+                                stream_id = obj.optInt("stream_id"),
+                                name = obj.optString("name"),
+                                title = obj.optString("name"),
+                                stream_icon = obj.optString("stream_icon"),
+                                container_extension = obj.optString("container_extension"),
+                                rating = obj.optString("rating"),
+                                category_id = obj.optString("category_id"),
+                                added = obj.optLong("added")
+                            ))
+                        }
+                        if (batch.isNotEmpty()) db.streamDao().insertVodStreams(batch)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
-                if (batch.isNotEmpty()) db.streamDao().insertVodStreams(batch)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
 
-            // SÃ‰RIES â€” apenas 20
-            try {
-                val seriesUrl = "${base}player_api.php?username=$user&password=$pass&action=get_series"
-                val response = URL(seriesUrl).readText()
-                val jsonArray = JSONArray(response)
-                val batch = mutableListOf<SeriesEntity>()
-                val limit = minOf(20, jsonArray.length())
+                val jobSeries = async(Dispatchers.IO) {
+                    try {
+                        val seriesUrl = "${base}player_api.php?username=$user&password=$pass&action=get_series"
+                        val response = URL(seriesUrl).readText()
+                        val jsonArray = JSONArray(response)
+                        val batch = mutableListOf<SeriesEntity>()
+                        val limit = minOf(10, jsonArray.length()) // ✅ 10 itens (era 20)
 
-                for (i in 0 until limit) {
-                    val obj = jsonArray.getJSONObject(i)
-                    batch.add(SeriesEntity(
-                        series_id = obj.optInt("series_id"),
-                        name = obj.optString("name"),
-                        cover = obj.optString("cover"),
-                        rating = obj.optString("rating"),
-                        category_id = obj.optString("category_id"),
-                        last_modified = obj.optLong("last_modified")
-                    ))
+                        for (i in 0 until limit) {
+                            val obj = jsonArray.getJSONObject(i)
+                            batch.add(SeriesEntity(
+                                series_id = obj.optInt("series_id"),
+                                name = obj.optString("name"),
+                                cover = obj.optString("cover"),
+                                rating = obj.optString("rating"),
+                                category_id = obj.optString("category_id"),
+                                last_modified = obj.optLong("last_modified")
+                            ))
+                        }
+                        if (batch.isNotEmpty()) db.streamDao().insertSeriesStreams(batch)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
-                if (batch.isNotEmpty()) db.streamDao().insertSeriesStreams(batch)
-            } catch (e: Exception) {
-                e.printStackTrace()
+
+                // Aguarda os dois juntos — tempo total = o mais lento dos dois (não a soma)
+                jobFilmes.await()
+                jobSeries.await()
             }
 
         } catch (e: Exception) {
@@ -281,13 +300,11 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    // âœ… SEPARAÃ‡ÃƒO DE USUÃRIOS: limpa filmes, sÃ©ries e canais ao trocar de conta
     private suspend fun limparBancoPorTrocaDeUsuario() {
         try {
             val db = AppDatabase.getDatabase(applicationContext)
             withContext(Dispatchers.IO) {
                 db.streamDao().clearLive()
-                // Limpa VODs e SÃ©ries tambÃ©m via queries diretas
                 db.openHelper.writableDatabase.execSQL("DELETE FROM vod_streams")
                 db.openHelper.writableDatabase.execSQL("DELETE FROM series_streams")
                 db.openHelper.writableDatabase.execSQL("DELETE FROM watch_history")
@@ -311,20 +328,30 @@ class LoginActivity : AppCompatActivity() {
         return url
     }
 
+    // ✅ FIX #5: Validação mais robusta — verifica "auth" além de "user_info"
+    // Alguns servidores respondem com auth=0 (credenciais erradas) mas body válido
     private fun testarConexaoIndividual(baseUrl: String, user: String, pass: String): String? {
         val urlLimpa = normalizarBaseUrl(baseUrl).removeSuffix("/")
         val apiLogin = "$urlLimpa/player_api.php?username=$user&password=$pass"
 
         return try {
-            val request = Request.Builder().url(apiLogin).build()
+            val request = Request.Builder()
+                .url(apiLogin)
+                .header("User-Agent", "Mozilla/5.0")  // ✅ FIX: alguns servidores bloqueiam sem User-Agent
+                .build()
+
             client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     val body = response.body?.string() ?: ""
-                    if (body.contains("user_info") && body.contains("server_info")) {
-                        return urlLimpa
-                    }
+                    // ✅ Verifica se tem user_info E se auth != 0 (credenciais inválidas)
+                    val credenciaisValidas = body.contains("user_info") &&
+                            body.contains("server_info") &&
+                            !body.contains("\"auth\":0") &&
+                            !body.contains("\"auth\": 0")
+                    if (credenciaisValidas) urlLimpa else null
+                } else {
+                    null
                 }
-                null
             }
         } catch (e: Exception) {
             null
