@@ -184,13 +184,37 @@
                  CONTINUAR ASSISTINDO
                  Cards largos horizontais (16:9)
             ───────────────────────────────── -->
-            <include
+            <LinearLayout
                 android:id="@+id/layoutContinueHeader"
-                layout="@layout/include_section_header"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:paddingTop="24dp"
+                android:paddingBottom="10dp"
+                android:gravity="center_vertical"
                 android:layout_marginTop="20dp"
-                android:visibility="gone"/>
+                android:visibility="gone">
+
+                <View
+                    android:layout_width="3dp"
+                    android:layout_height="16dp"
+                    android:background="#E50914"
+                    android:layout_marginEnd="10dp"/>
+
+                <TextView
+                    android:id="@+id/tvContinueWatching"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Continuar Assistindo"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.01"/>
+
+            </LinearLayout>
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rvContinueWatching"
@@ -202,13 +226,6 @@
                 android:overScrollMode="never"
                 android:orientation="horizontal"
                 app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                android:visibility="gone"/>
-
-            <!-- Texto invisível para compatibilidade com HomeActivity -->
-            <TextView
-                android:id="@+id/tvContinueWatching"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
                 android:visibility="gone"/>
 
             <!-- ─────────────────────────────────
