@@ -24,6 +24,7 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.Priority
 import com.bumptech.glide.load.DecodeFormat
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.vltv.play.data.AppDatabase
 import com.vltv.play.data.VodEntity
 import com.google.android.material.bottomnavigation.BottomNavigationView // ✅ Menu Importado
@@ -172,7 +173,7 @@ class VodActivity : AppCompatActivity() {
                 val url = filmes[i].icon
                 if (!url.isNullOrEmpty()) {
                     withContext(Dispatchers.Main) {
-                        Glide.with(this@VodActivity).asBitmap().load(url).format(DecodeFormat.PREFER_RGB_565).diskCacheStrategy(DiskCacheStrategy.ALL).priority(Priority.LOW).preload(180, 270)
+                        Glide.with(this@VodActivity).asBitmap().load(url).format(DecodeFormat.PREFER_ARGB_8888).diskCacheStrategy(DiskCacheStrategy.ALL).priority(Priority.LOW).preload(240, 360)
                     }
                 }
             }
@@ -364,13 +365,28 @@ class VodActivity : AppCompatActivity() {
             h.tvName.text = item.name
             h.tvName.visibility = View.VISIBLE
             h.imgLogo.visibility = View.GONE
-            Glide.with(h.itemView.context).asBitmap().load(item.icon).format(DecodeFormat.PREFER_RGB_565).override(180, 270).diskCacheStrategy(DiskCacheStrategy.ALL).placeholder(R.drawable.bg_logo_placeholder).centerCrop().into(h.imgPoster)
+
+            Glide.with(h.itemView.context)
+                .load(item.icon)
+                .format(DecodeFormat.PREFER_ARGB_8888)
+                .override(240, 360)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .placeholder(R.drawable.bg_logo_placeholder)
+                .thumbnail(0.15f)
+                .transition(DrawableTransitionOptions.withCrossFade(200))
+                .centerCrop()
+                .into(h.imgPoster)
 
             val cachedUrl = gridCachePrefs.getString("logo_${item.name}", null)
             if (cachedUrl != null) {
                 h.tvName.visibility = View.GONE
                 h.imgLogo.visibility = View.VISIBLE
-                Glide.with(h.itemView.context).load(cachedUrl).into(h.imgLogo)
+                Glide.with(h.itemView.context)
+                    .load(cachedUrl)
+                    .format(DecodeFormat.PREFER_ARGB_8888)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .transition(DrawableTransitionOptions.withCrossFade(150))
+                    .into(h.imgLogo)
             } else {
                 h.job = CoroutineScope(Dispatchers.IO).launch {
                     val url = searchTmdbLogoSilently(item.name)
@@ -379,13 +395,30 @@ class VodActivity : AppCompatActivity() {
                             if (h.adapterPosition == p) {
                                 h.tvName.visibility = View.GONE
                                 h.imgLogo.visibility = View.VISIBLE
-                                Glide.with(h.itemView.context).load(url).format(DecodeFormat.PREFER_RGB_565).override(180, 100).into(h.imgLogo)
+                                Glide.with(h.itemView.context)
+                                    .load(url)
+                                    .format(DecodeFormat.PREFER_ARGB_8888)
+                                    .override(200, 110)
+                                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                    .transition(DrawableTransitionOptions.withCrossFade(200))
+                                    .into(h.imgLogo)
                             }
                         }
                     }
                 }
             }
+
             h.itemView.setOnClickListener { onClick(item) }
+
+            h.itemView.setOnFocusChangeListener { v, hasFocus ->
+                if (hasFocus) {
+                    v.animate().scaleX(1.08f).scaleY(1.08f).translationZ(16f).setDuration(180).start()
+                    v.findViewById<View>(R.id.viewFocusBorder)?.visibility = View.VISIBLE
+                } else {
+                    v.animate().scaleX(1f).scaleY(1f).translationZ(0f).setDuration(180).start()
+                    v.findViewById<View>(R.id.viewFocusBorder)?.visibility = View.INVISIBLE
+                }
+            }
         }
         override fun getItemCount() = list.size
 
