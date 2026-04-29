@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
@@ -51,14 +53,15 @@ class LoginActivity : AppCompatActivity() {
         "http://blackdeluxe.shop"
     )
 
-    // ✅ FIX #1: Timeout aumentado — 5s era curto demais para servidores lentos
-    // connectTimeout: tempo para estabelecer a conexão TCP
-    // readTimeout: tempo para receber a resposta depois de conectado
     private val client = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(12, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)   // ✅ FIX: tenta reconectar automaticamente
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .build()
+
+    private val dotsHandler = Handler(Looper.getMainLooper())
+    private var dotsJob: Runnable? = null
+    private var dotsCount = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,27 +102,21 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        // ✅ FIX DUPLO CLIQUE: focusableInTouchMode no botão fazia o 1º toque
-        // apenas ganhar foco e o 2º disparar o clique. Forçamos false aqui por
-        // código para garantir, independente do que estiver no XML.
         binding.btnLogin.isFocusableInTouchMode = false
         binding.btnLogin.isFocusable = false
 
         binding.etUsername.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_NEXT) {
-                binding.etPassword.requestFocus()
-                true
+                binding.etPassword.requestFocus(); true
             } else false
         }
 
         binding.etPassword.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_GO) {
-                binding.btnLogin.callOnClick()
-                true
+                binding.btnLogin.callOnClick(); true
             } else false
         }
 
-        // ✅ Debounce 800ms: evita duplo disparo mesmo que o usuário toque rápido
         var ultimoClique = 0L
         binding.btnLogin.setOnClickListener {
             val agora = System.currentTimeMillis()
@@ -139,6 +136,44 @@ class LoginActivity : AppCompatActivity() {
         binding.etUsername.requestFocus()
     }
 
+    // ✅ Animação dos pontinhos "." ".." "..."
+    private fun iniciarAnimacaoPontinhos() {
+        dotsJob = object : Runnable {
+            override fun run() {
+                dotsCount = (dotsCount + 1) % 4
+                try { binding.tvLoadingDots?.text = ".".repeat(dotsCount) } catch (e: Exception) {}
+                dotsHandler.postDelayed(this, 400)
+            }
+        }
+        dotsHandler.post(dotsJob!!)
+    }
+
+    private fun pararAnimacaoPontinhos() {
+        dotsJob?.let { dotsHandler.removeCallbacks(it) }
+        dotsJob = null
+    }
+
+    private fun mostrarLoading() {
+        binding.btnLogin.isEnabled = false
+        binding.etUsername.isEnabled = false
+        binding.etPassword.isEnabled = false
+        try { binding.layoutLoading?.visibility = View.VISIBLE } catch (e: Exception) {
+            // fallback para XML antigo
+            binding.progressBar.visibility = View.VISIBLE
+        }
+        iniciarAnimacaoPontinhos()
+    }
+
+    private fun esconderLoading() {
+        pararAnimacaoPontinhos()
+        try { binding.layoutLoading?.visibility = View.GONE } catch (e: Exception) {
+            binding.progressBar.visibility = View.GONE
+        }
+        binding.btnLogin.isEnabled = true
+        binding.etUsername.isEnabled = true
+        binding.etPassword.isEnabled = true
+    }
+
     private fun verificarEIniciarRapido(dns: String, user: String, pass: String) {
         lifecycleScope.launch(Dispatchers.IO) {
             val db = AppDatabase.getDatabase(applicationContext)
@@ -151,8 +186,7 @@ class LoginActivity : AppCompatActivity() {
                     binding = ActivityLoginBinding.inflate(layoutInflater)
                     setContentView(binding.root)
                     aplicarModoImersivo()
-                    binding.progressBar.visibility = View.VISIBLE
-                    Toast.makeText(this@LoginActivity, "Primeiro acesso, carregando...", Toast.LENGTH_SHORT).show()
+                    mostrarLoading()
 
                     launch(Dispatchers.IO) {
                         preCarregarLoteMinimo(dns, user, pass)
@@ -164,140 +198,146 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun iniciarLoginTurbo(user: String, pass: String) {
-        binding.progressBar.visibility = View.VISIBLE
-        binding.btnLogin.isEnabled = false
-        binding.etUsername.isEnabled = false
-        binding.etPassword.isEnabled = false
+        mostrarLoading()
 
         lifecycleScope.launch(Dispatchers.IO) {
-
-            // ✅ FIX #2: Usar select{} para pegar o PRIMEIRO servidor que responder
-            // Antes: loop de polling a cada 100ms com race condition
-            // Agora: cada servidor corre em paralelo e o vencedor cancela os demais imediatamente
             var dnsVencedor: String? = null
 
+            // ── Fase 1: todos em paralelo, timeout 20s ────────────────────
             try {
-                dnsVencedor = withTimeoutOrNull(15_000L) {
-                    // Canal de capacidade 1: só o primeiro resultado importa
-                    val canal = kotlinx.coroutines.channels.Channel<String>(1)
-
+                dnsVencedor = withTimeoutOrNull(20_000L) {
+                    val canal = kotlinx.coroutines.channels.Channel<String>(
+                        kotlinx.coroutines.channels.Channel.UNLIMITED
+                    )
                     val jobs = SERVERS.map { url ->
                         launch(Dispatchers.IO) {
-                            val resultado = testarConexaoIndividual(url, user, pass)
-                            if (resultado != null) {
-                                canal.trySend(resultado)
-                            }
+                            val r = testarConexaoIndividual(url, user, pass)
+                            if (r != null) canal.trySend(r)
                         }
                     }
-
-                    // Aguarda o primeiro resultado ou timeout
-                    val vencedor = canal.receive()
-                    jobs.forEach { it.cancel() }  // cancela os demais imediatamente
+                    // Aguarda o primeiro resultado
+                    val vencedor = withTimeoutOrNull(19_000L) { canal.receive() }
+                    jobs.forEach { it.cancel() }
                     canal.close()
                     vencedor
                 }
-            } catch (e: Exception) {
-                // timeout ou falha geral
+            } catch (e: Exception) { e.printStackTrace() }
+
+            // ── Fase 2: fallback sequencial nos principais com timeout 25s ─
+            if (dnsVencedor == null) {
+                val principais = listOf(
+                    "http://fibercdn.sbs",
+                    "http://cmdtv.top",
+                    "http://cmdbr.life",
+                    "http://blackdns.shop",
+                    "http://ranos.sbs",
+                    "http://cmdtv.sbs",
+                    "http://tvblack.shop"
+                )
+                for (servidor in principais) {
+                    val r = testarConexaoIndividualLento(servidor, user, pass)
+                    if (r != null) { dnsVencedor = r; break }
+                }
             }
 
             if (dnsVencedor != null) {
                 val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
                 val usuarioAnterior = prefs.getString("username", null)
-
                 if (usuarioAnterior != null && usuarioAnterior != user) {
                     limparBancoPorTrocaDeUsuario()
                 }
-
                 salvarCredenciais(dnsVencedor, user, pass)
-
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@LoginActivity, "Conectando à VLTV+", Toast.LENGTH_SHORT).show()
-                }
-
-                // ✅ FIX #3: Pré-carregamento paralelo (filmes + séries ao mesmo tempo)
-                // Antes: sequencial — filmes primeiro, depois séries (~2x mais lento)
-                // Agora: ambos em paralelo com coroutineScope
                 preCarregarLoteMinimo(dnsVencedor, user, pass)
-                withContext(Dispatchers.Main) { decidirProximaTela() }
-
+                withContext(Dispatchers.Main) {
+                    pararAnimacaoPontinhos()
+                    decidirProximaTela()
+                }
             } else {
                 withContext(Dispatchers.Main) {
-                    mostrarErro("Nenhum servidor respondeu. Verifique login e senha.")
+                    esconderLoading()
+                    mostrarErro("Servidor não encontrado. Verifique login e senha.")
                 }
             }
         }
     }
 
-    // ✅ FIX #4: Pré-carrega filmes E séries em paralelo (coroutineScope = aguarda ambos)
-    // Reduzido de 20 para 10 itens cada — suficiente para a tela não aparecer vazia,
-    // mas 2x mais rápido. O restante é sincronizado pelo HomeActivity em background.
+    private fun testarConexaoIndividual(baseUrl: String, user: String, pass: String): String? {
+        val urlLimpa = normalizarBaseUrl(baseUrl).removeSuffix("/")
+        return try {
+            val request = Request.Builder()
+                .url("$urlLimpa/player_api.php?username=$user&password=$pass")
+                .header("User-Agent", "Mozilla/5.0")
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string() ?: ""
+                    val valido = body.contains("user_info") &&
+                            body.contains("server_info") &&
+                            !body.contains("\"auth\":0") &&
+                            !body.contains("\"auth\": 0")
+                    if (valido) urlLimpa else null
+                } else null
+            }
+        } catch (e: Exception) { null }
+    }
+
+    private fun testarConexaoIndividualLento(baseUrl: String, user: String, pass: String): String? {
+        val clientLento = OkHttpClient.Builder()
+            .connectTimeout(25, TimeUnit.SECONDS)
+            .readTimeout(25, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
+        val urlLimpa = normalizarBaseUrl(baseUrl).removeSuffix("/")
+        return try {
+            val request = Request.Builder()
+                .url("$urlLimpa/player_api.php?username=$user&password=$pass")
+                .header("User-Agent", "Mozilla/5.0")
+                .build()
+            clientLento.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    val body = response.body?.string() ?: ""
+                    val valido = body.contains("user_info") &&
+                            body.contains("server_info") &&
+                            !body.contains("\"auth\":0") &&
+                            !body.contains("\"auth\": 0")
+                    if (valido) urlLimpa else null
+                } else null
+            }
+        } catch (e: Exception) { null }
+    }
+
     private suspend fun preCarregarLoteMinimo(dns: String, user: String, pass: String) {
         try {
             val db = AppDatabase.getDatabase(this)
             val base = normalizarBaseUrl(dns)
-
             coroutineScope {
-                // Filmes e séries baixam ao mesmo tempo
-                val jobFilmes = async(Dispatchers.IO) {
+                val jF = async(Dispatchers.IO) {
                     try {
-                        val vodUrl = "${base}player_api.php?username=$user&password=$pass&action=get_vod_streams"
-                        val response = URL(vodUrl).readText()
-                        val jsonArray = JSONArray(response)
+                        val r = URL("${base}player_api.php?username=$user&password=$pass&action=get_vod_streams").readText()
+                        val arr = JSONArray(r)
                         val batch = mutableListOf<VodEntity>()
-                        val limit = minOf(10, jsonArray.length()) // ✅ 10 itens (era 20)
-
-                        for (i in 0 until limit) {
-                            val obj = jsonArray.getJSONObject(i)
-                            batch.add(VodEntity(
-                                stream_id = obj.optInt("stream_id"),
-                                name = obj.optString("name"),
-                                title = obj.optString("name"),
-                                stream_icon = obj.optString("stream_icon"),
-                                container_extension = obj.optString("container_extension"),
-                                rating = obj.optString("rating"),
-                                category_id = obj.optString("category_id"),
-                                added = obj.optLong("added")
-                            ))
+                        for (i in 0 until minOf(10, arr.length())) {
+                            val o = arr.getJSONObject(i)
+                            batch.add(VodEntity(o.optInt("stream_id"), o.optString("name"), o.optString("name"), o.optString("stream_icon"), o.optString("container_extension"), o.optString("rating"), o.optString("category_id"), o.optLong("added")))
                         }
                         if (batch.isNotEmpty()) db.streamDao().insertVodStreams(batch)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                    } catch (e: Exception) { e.printStackTrace() }
                 }
-
-                val jobSeries = async(Dispatchers.IO) {
+                val jS = async(Dispatchers.IO) {
                     try {
-                        val seriesUrl = "${base}player_api.php?username=$user&password=$pass&action=get_series"
-                        val response = URL(seriesUrl).readText()
-                        val jsonArray = JSONArray(response)
+                        val r = URL("${base}player_api.php?username=$user&password=$pass&action=get_series").readText()
+                        val arr = JSONArray(r)
                         val batch = mutableListOf<SeriesEntity>()
-                        val limit = minOf(10, jsonArray.length()) // ✅ 10 itens (era 20)
-
-                        for (i in 0 until limit) {
-                            val obj = jsonArray.getJSONObject(i)
-                            batch.add(SeriesEntity(
-                                series_id = obj.optInt("series_id"),
-                                name = obj.optString("name"),
-                                cover = obj.optString("cover"),
-                                rating = obj.optString("rating"),
-                                category_id = obj.optString("category_id"),
-                                last_modified = obj.optLong("last_modified")
-                            ))
+                        for (i in 0 until minOf(10, arr.length())) {
+                            val o = arr.getJSONObject(i)
+                            batch.add(SeriesEntity(o.optInt("series_id"), o.optString("name"), o.optString("cover"), o.optString("rating"), o.optString("category_id"), o.optLong("last_modified")))
                         }
                         if (batch.isNotEmpty()) db.streamDao().insertSeriesStreams(batch)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                    } catch (e: Exception) { e.printStackTrace() }
                 }
-
-                // Aguarda os dois juntos — tempo total = o mais lento dos dois (não a soma)
-                jobFilmes.await()
-                jobSeries.await()
+                jF.await(); jS.await()
             }
-
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
     private suspend fun limparBancoPorTrocaDeUsuario() {
@@ -309,85 +349,38 @@ class LoginActivity : AppCompatActivity() {
                 db.openHelper.writableDatabase.execSQL("DELETE FROM series_streams")
                 db.openHelper.writableDatabase.execSQL("DELETE FROM watch_history")
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
     private fun normalizarBaseUrl(dns: String): String {
         var url = dns.trim()
-        if (url.contains("player_api.php")) {
-            url = url.substringBefore("player_api.php")
-        }
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            url = "http://$url"
-        }
-        if (!url.endsWith("/")) {
-            url += "/"
-        }
+        if (url.contains("player_api.php")) url = url.substringBefore("player_api.php")
+        if (!url.startsWith("http://") && !url.startsWith("https://")) url = "http://$url"
+        if (!url.endsWith("/")) url += "/"
         return url
     }
 
-    // ✅ FIX #5: Validação mais robusta — verifica "auth" além de "user_info"
-    // Alguns servidores respondem com auth=0 (credenciais erradas) mas body válido
-    private fun testarConexaoIndividual(baseUrl: String, user: String, pass: String): String? {
-        val urlLimpa = normalizarBaseUrl(baseUrl).removeSuffix("/")
-        val apiLogin = "$urlLimpa/player_api.php?username=$user&password=$pass"
-
-        return try {
-            val request = Request.Builder()
-                .url(apiLogin)
-                .header("User-Agent", "Mozilla/5.0")  // ✅ FIX: alguns servidores bloqueiam sem User-Agent
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val body = response.body?.string() ?: ""
-                    // ✅ Verifica se tem user_info E se auth != 0 (credenciais inválidas)
-                    val credenciaisValidas = body.contains("user_info") &&
-                            body.contains("server_info") &&
-                            !body.contains("\"auth\":0") &&
-                            !body.contains("\"auth\": 0")
-                    if (credenciaisValidas) urlLimpa else null
-                } else {
-                    null
-                }
-            }
-        } catch (e: Exception) {
-            null
-        }
-    }
-
     private fun salvarCredenciais(dns: String, user: String, pass: String) {
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        prefs.edit().apply {
-            putString("dns", dns)
-            putString("username", user)
-            putString("password", pass)
-            apply()
+        getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE).edit().apply {
+            putString("dns", dns); putString("username", user); putString("password", pass); apply()
         }
         XtreamApi.salvarDns(this, dns)
     }
 
     private fun decidirProximaTela() {
-        if (isTv()) {
-            val intent = Intent(this, HomeActivity::class.java)
-            intent.putExtra("PROFILE_NAME", "TV_Box")
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            startActivity(intent)
-        } else {
-            val intent = Intent(this, ProfilesActivity::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            startActivity(intent)
-        }
+        val intent = if (isTv()) Intent(this, HomeActivity::class.java).apply { putExtra("PROFILE_NAME", "TV_Box") }
+                     else Intent(this, ProfilesActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
         finish()
     }
 
     private fun mostrarErro(msg: String) {
-        binding.progressBar.visibility = View.GONE
-        binding.btnLogin.isEnabled = true
-        binding.etUsername.isEnabled = true
-        binding.etPassword.isEnabled = true
         Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+    }
+
+    override fun onDestroy() {
+        pararAnimacaoPontinhos()
+        super.onDestroy()
     }
 }
