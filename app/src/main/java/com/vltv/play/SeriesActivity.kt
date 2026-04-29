@@ -25,6 +25,7 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.Priority
 import com.bumptech.glide.load.DecodeFormat
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.target.Target
 import retrofit2.Call
 import retrofit2.Callback
@@ -204,9 +205,9 @@ class SeriesActivity : AppCompatActivity() {
                         Glide.with(this@SeriesActivity)
                             .load(url)
                             .diskCacheStrategy(DiskCacheStrategy.ALL)
-                            .format(DecodeFormat.PREFER_RGB_565)
+                            .format(DecodeFormat.PREFER_ARGB_8888)
                             .priority(Priority.LOW) 
-                            .preload(180, 270)
+                            .preload(240, 360)
                     }
                 }
             }
@@ -259,7 +260,7 @@ class SeriesActivity : AppCompatActivity() {
                         Glide.with(this@SeriesActivity)
                             .load(fullLogoUrl)
                             .diskCacheStrategy(DiskCacheStrategy.ALL)
-                            .format(DecodeFormat.PREFER_RGB_565)
+                            .format(DecodeFormat.PREFER_ARGB_8888)
                             .preload()
                     }
                 }
@@ -602,15 +603,15 @@ class SeriesActivity : AppCompatActivity() {
             val context = holder.itemView.context
             
             Glide.with(context)
-                .asBitmap()
                 .load(item.icon)
+                .format(DecodeFormat.PREFER_ARGB_8888)
+                .override(240, 360)
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .format(DecodeFormat.PREFER_RGB_565)
-                .override(180, 270)
                 .priority(if (isTelevision(context)) Priority.HIGH else Priority.IMMEDIATE)
-                .thumbnail(0.1f)
+                .thumbnail(0.15f)
                 .placeholder(R.drawable.bg_logo_placeholder)
                 .error(R.drawable.bg_logo_placeholder)
+                .transition(DrawableTransitionOptions.withCrossFade(200))
                 .centerCrop()
                 .into(holder.imgPoster)
 
@@ -620,9 +621,10 @@ class SeriesActivity : AppCompatActivity() {
                 holder.imgLogo.visibility = View.VISIBLE
                 Glide.with(context)
                     .load(cachedUrl)
-                    .format(DecodeFormat.PREFER_RGB_565)
-                    .override(180, 100)
+                    .format(DecodeFormat.PREFER_ARGB_8888)
+                    .override(200, 110)
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .transition(DrawableTransitionOptions.withCrossFade(180))
                     .into(holder.imgLogo)
             } else {
                 holder.job = CoroutineScope(Dispatchers.IO).launch {
@@ -636,20 +638,16 @@ class SeriesActivity : AppCompatActivity() {
             holder.itemView.setOnFocusChangeListener { view, hasFocus ->
                 if (hasFocus) {
                     holder.tvName.setTextColor(Color.YELLOW)
-                    holder.tvName.textSize = 18f
-                    view.animate().scaleX(1.15f).scaleY(1.15f).setDuration(150).start()
+                    view.animate().scaleX(1.10f).scaleY(1.10f).setDuration(160).start()
                     view.elevation = 20f
                     view.setBackgroundResource(R.drawable.bg_focus_neon)
-                    if (holder.imgLogo.visibility != View.VISIBLE) holder.tvName.visibility = View.VISIBLE
                     view.alpha = 1.0f
                 } else {
                     holder.tvName.setTextColor(Color.WHITE)
-                    holder.tvName.textSize = 14f
-                    view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(160).start()
                     view.elevation = 4f
                     view.setBackgroundResource(0)
-                    holder.tvName.visibility = View.GONE
-                    view.alpha = 0.8f
+                    view.alpha = 1.0f
                 }
             }
 
@@ -696,9 +694,10 @@ class SeriesActivity : AppCompatActivity() {
                                 targetView.visibility = View.VISIBLE
                                 Glide.with(targetView.context)
                                     .load(finalUrl)
-                                    .format(DecodeFormat.PREFER_RGB_565)
-                                    .override(180, 100)
+                                    .format(DecodeFormat.PREFER_ARGB_8888)
+                                    .override(200, 110)
                                     .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                    .transition(DrawableTransitionOptions.withCrossFade(180))
                                     .into(targetView)
                                 holder.tvName.visibility = View.GONE
                             }
