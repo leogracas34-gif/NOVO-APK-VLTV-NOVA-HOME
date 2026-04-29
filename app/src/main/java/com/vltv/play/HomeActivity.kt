@@ -288,8 +288,8 @@ class HomeActivity : AppCompatActivity() {
                         val top10Movies = if (movieItems.size > 20) movieItems.subList(20, minOf(30, movieItems.size))
                                           else movieItems.take(10)
                         if (top10Movies.isNotEmpty()) {
-                            binding.rvTop10Movies.setHasFixedSize(true)
-                            binding.rvTop10Movies.adapter = Top10Adapter(top10Movies) { selectedItem ->
+                            binding.rvTop10Movies?.setHasFixedSize(true)
+                            binding.rvTop10Movies?.adapter = Top10Adapter(top10Movies) { selectedItem ->
                                 val intent = Intent(this@HomeActivity, DetailsActivity::class.java)
                                 intent.putExtra("stream_id", selectedItem.id.toIntOrNull() ?: 0)
                                 intent.putExtra("name", selectedItem.name)
@@ -306,8 +306,8 @@ class HomeActivity : AppCompatActivity() {
                         val top10Series = if (seriesItems.size > 20) seriesItems.subList(20, minOf(30, seriesItems.size))
                                           else seriesItems.take(10)
                         if (top10Series.isNotEmpty()) {
-                            binding.rvTop10Series.setHasFixedSize(true)
-                            binding.rvTop10Series.adapter = Top10Adapter(top10Series) { selectedItem ->
+                            binding.rvTop10Series?.setHasFixedSize(true)
+                            binding.rvTop10Series?.adapter = Top10Adapter(top10Series) { selectedItem ->
                                 val intent = Intent(this@HomeActivity, SeriesDetailsActivity::class.java)
                                 intent.putExtra("series_id", selectedItem.id.toIntOrNull() ?: 0)
                                 intent.putExtra("name", selectedItem.name)
@@ -326,9 +326,8 @@ class HomeActivity : AppCompatActivity() {
                         val novidades = (novidadesFilmes + novidadesSeries).shuffled().take(20)
 
                         if (novidades.isNotEmpty()) {
-                            binding.rvNovidades.setHasFixedSize(true)
-                            binding.rvNovidades.adapter = HomeRowAdapter(novidades) { selectedItem ->
-                                // Tenta abrir como série primeiro, senão como filme
+                            binding.rvNovidades?.setHasFixedSize(true)
+                            binding.rvNovidades?.adapter = HomeRowAdapter(novidades) { selectedItem ->
                                 val isSeries = novidadesSeries.any { it.id == selectedItem.id }
                                 val intent = if (isSeries)
                                     Intent(this@HomeActivity, SeriesDetailsActivity::class.java).apply { putExtra("series_id", selectedItem.id.toIntOrNull() ?: 0) }
