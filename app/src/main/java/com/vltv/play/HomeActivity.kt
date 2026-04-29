@@ -244,18 +244,20 @@ class HomeActivity : AppCompatActivity() {
     private fun carregarDadosLocaisImediato() {
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val localMovies = database.streamDao().getRecentVods(20)
+                // ✅ Busca mais itens para alimentar todas as seções
+                val localMovies = database.streamDao().getRecentVods(60)
                 val movieItems = localMovies.map { VodItem(it.stream_id.toString(), limparNomeExibicao(it.name), it.stream_icon ?: "") }
 
-                val localSeries = database.streamDao().getRecentSeries(20)
+                val localSeries = database.streamDao().getRecentSeries(60)
                 val seriesItems = localSeries.map { VodItem(it.series_id.toString(), limparNomeExibicao(it.name), it.cover ?: "") }
 
                 withContext(Dispatchers.Main) {
+
+                    // ── FILMES PARA VOCÊ (primeiros 20) ──────────────────
                     if (movieItems.isNotEmpty()) {
                         binding.rvRecentlyAdded.setHasFixedSize(true)
                         binding.rvRecentlyAdded.setItemViewCacheSize(20)
-
-                        binding.rvRecentlyAdded.adapter = HomeRowAdapter(movieItems) { selectedItem ->
+                        binding.rvRecentlyAdded.adapter = HomeRowAdapter(movieItems.take(20)) { selectedItem ->
                             val intent = Intent(this@HomeActivity, DetailsActivity::class.java)
                             intent.putExtra("stream_id", selectedItem.id.toIntOrNull() ?: 0)
                             intent.putExtra("name", selectedItem.name)
@@ -265,11 +267,12 @@ class HomeActivity : AppCompatActivity() {
                             startActivity(intent)
                         }
                     }
+
+                    // ── SÉRIES PARA VOCÊ (primeiros 20) ──────────────────
                     if (seriesItems.isNotEmpty()) {
                         binding.rvRecentSeries.setHasFixedSize(true)
                         binding.rvRecentSeries.setItemViewCacheSize(20)
-
-                        binding.rvRecentSeries.adapter = HomeRowAdapter(seriesItems) { selectedItem ->
+                        binding.rvRecentSeries.adapter = HomeRowAdapter(seriesItems.take(20)) { selectedItem ->
                             val intent = Intent(this@HomeActivity, SeriesDetailsActivity::class.java)
                             intent.putExtra("series_id", selectedItem.id.toIntOrNull() ?: 0)
                             intent.putExtra("name", selectedItem.name)
@@ -280,9 +283,67 @@ class HomeActivity : AppCompatActivity() {
                         }
                     }
 
+                    // ── TOP 10 FILMES (itens 20-30 — diversifica o conteúdo) ──
+                    try {
+                        val top10Movies = if (movieItems.size > 20) movieItems.subList(20, minOf(30, movieItems.size))
+                                          else movieItems.take(10)
+                        if (top10Movies.isNotEmpty()) {
+                            binding.rvTop10Movies.setHasFixedSize(true)
+                            binding.rvTop10Movies.adapter = Top10Adapter(top10Movies) { selectedItem ->
+                                val intent = Intent(this@HomeActivity, DetailsActivity::class.java)
+                                intent.putExtra("stream_id", selectedItem.id.toIntOrNull() ?: 0)
+                                intent.putExtra("name", selectedItem.name)
+                                intent.putExtra("icon", selectedItem.streamIcon)
+                                intent.putExtra("PROFILE_NAME", currentProfile)
+                                intent.putExtra("is_series", false)
+                                startActivity(intent)
+                            }
+                        }
+                    } catch (e: Exception) { e.printStackTrace() }
+
+                    // ── TOP 10 SÉRIES (itens 20-30) ──────────────────────
+                    try {
+                        val top10Series = if (seriesItems.size > 20) seriesItems.subList(20, minOf(30, seriesItems.size))
+                                          else seriesItems.take(10)
+                        if (top10Series.isNotEmpty()) {
+                            binding.rvTop10Series.setHasFixedSize(true)
+                            binding.rvTop10Series.adapter = Top10Adapter(top10Series) { selectedItem ->
+                                val intent = Intent(this@HomeActivity, SeriesDetailsActivity::class.java)
+                                intent.putExtra("series_id", selectedItem.id.toIntOrNull() ?: 0)
+                                intent.putExtra("name", selectedItem.name)
+                                intent.putExtra("icon", selectedItem.streamIcon)
+                                intent.putExtra("PROFILE_NAME", currentProfile)
+                                intent.putExtra("is_series", true)
+                                startActivity(intent)
+                            }
+                        }
+                    } catch (e: Exception) { e.printStackTrace() }
+
+                    // ── NOVIDADES (mistura filmes + séries recentes 30-50) ──
+                    try {
+                        val novidadesFilmes = if (movieItems.size > 30) movieItems.subList(30, minOf(40, movieItems.size)) else emptyList()
+                        val novidadesSeries = if (seriesItems.size > 30) seriesItems.subList(30, minOf(40, seriesItems.size)) else emptyList()
+                        val novidades = (novidadesFilmes + novidadesSeries).shuffled().take(20)
+
+                        if (novidades.isNotEmpty()) {
+                            binding.rvNovidades.setHasFixedSize(true)
+                            binding.rvNovidades.adapter = HomeRowAdapter(novidades) { selectedItem ->
+                                // Tenta abrir como série primeiro, senão como filme
+                                val isSeries = novidadesSeries.any { it.id == selectedItem.id }
+                                val intent = if (isSeries)
+                                    Intent(this@HomeActivity, SeriesDetailsActivity::class.java).apply { putExtra("series_id", selectedItem.id.toIntOrNull() ?: 0) }
+                                else
+                                    Intent(this@HomeActivity, DetailsActivity::class.java).apply { putExtra("stream_id", selectedItem.id.toIntOrNull() ?: 0) }
+                                intent.putExtra("name", selectedItem.name)
+                                intent.putExtra("icon", selectedItem.streamIcon)
+                                intent.putExtra("PROFILE_NAME", currentProfile)
+                                startActivity(intent)
+                            }
+                        }
+                    } catch (e: Exception) { e.printStackTrace() }
+
                     listaCompletaParaSorteio = (localMovies + localSeries)
                     sortearBannerUnico()
-
                     ativarModoSupersonico(movieItems, seriesItems)
                     carregarContinuarAssistindoLocal()
                 }
@@ -1002,5 +1063,48 @@ class HomeActivity : AppCompatActivity() {
                 Toast.makeText(this, "Busca de dispositivos ativada", Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    // ✅ TOP 10 ADAPTER — card com número enorme estilo Netflix
+    inner class Top10Adapter(
+        private val list: List<VodItem>,
+        private val onItemClick: (VodItem) -> Unit
+    ) : RecyclerView.Adapter<Top10Adapter.ViewHolder>() {
+
+        inner class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+            val ivPoster: ImageView = view.findViewById(R.id.ivPoster)
+            val tvRank: TextView = view.findViewById(R.id.tvRankNumber)
+            val tvTitle: TextView = view.findViewById(R.id.tvTitle)
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_top10_card, parent, false)
+            return ViewHolder(view)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val item = list[position]
+            holder.tvRank.text = (position + 1).toString()
+            holder.tvTitle.text = item.name
+
+            Glide.with(holder.itemView.context)
+                .asBitmap()
+                .load(item.streamIcon)
+                .override(160, 240)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .placeholder(R.drawable.ic_launcher)
+                .into(holder.ivPoster)
+
+            holder.itemView.setOnClickListener { onItemClick(item) }
+
+            holder.itemView.setOnFocusChangeListener { v, hasFocus ->
+                v.scaleX = if (hasFocus) 1.08f else 1.0f
+                v.scaleY = if (hasFocus) 1.08f else 1.0f
+                v.elevation = if (hasFocus) 12f else 0f
+            }
+        }
+
+        override fun getItemCount() = list.size
     }
 }
