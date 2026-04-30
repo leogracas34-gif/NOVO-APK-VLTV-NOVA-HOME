@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:focusable="true"
-    android:focusableInTouchMode="true"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="3dp"
-    app:cardBackgroundColor="#2A2A2A">
+    android:focusable="true"
+    android:clickable="true"
+    app:cardCornerRadius="10dp"
+    app:cardElevation="4dp"
+    app:cardBackgroundColor="#111118">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -16,50 +17,64 @@
         android:orientation="vertical"
         android:padding="8dp">
 
-        <ImageView
-            android:id="@+id/imgLogo"
+        <!-- Logo do canal -->
+        <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="56dp"
-            android:scaleType="fitCenter"
-            android:adjustViewBounds="true"
-            android:background="@drawable/bg_logo_round"
-            android:padding="6dp"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="6dp"
+            app:cardCornerRadius="6dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="#0A0A14">
 
+            <ImageView
+                android:id="@+id/imgLogo"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:padding="6dp"
+                android:contentDescription="Logo do canal"/>
+
+        </androidx.cardview.widget.CardView>
+
+        <!-- Nome do canal -->
         <TextView
             android:id="@+id/tvName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Canal Name"
+            android:text=""
             android:textColor="#FFFFFF"
-            android:textSize="12sp"
+            android:textSize="10sp"
             android:textStyle="bold"
-            android:gravity="center"
             android:maxLines="1"
-            android:ellipsize="end" />
+            android:ellipsize="end"
+            android:gravity="center"
+            android:fontFamily="sans-serif-condensed"/>
 
+        <!-- EPG: programa atual -->
         <TextView
             android:id="@+id/tvNow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Programa atual"
-            android:textColor="#FF4444"
-            android:textSize="10sp"
-            android:gravity="center"
             android:layout_marginTop="2dp"
+            android:text=""
+            android:textColor="#88FFFFFF"
+            android:textSize="8sp"
             android:maxLines="1"
-            android:ellipsize="end" />
+            android:ellipsize="end"
+            android:gravity="center"/>
 
+        <!-- EPG: próximo programa -->
         <TextView
             android:id="@+id/tvNext"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Próximo programa"
-            android:textColor="#AAAAAA"
-            android:textSize="9sp"
-            android:gravity="center"
+            android:text=""
+            android:textColor="#44FFFFFF"
+            android:textSize="7sp"
             android:maxLines="1"
-            android:ellipsize="end" />
+            android:ellipsize="end"
+            android:gravity="center"/>
 
     </LinearLayout>
+
 </androidx.cardview.widget.CardView>
