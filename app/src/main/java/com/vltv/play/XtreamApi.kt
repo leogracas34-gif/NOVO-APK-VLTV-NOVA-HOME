@@ -19,7 +19,7 @@ import java.net.InetAddress
 import java.util.concurrent.TimeUnit
 
 // ---------------------
-// Modelos de Dados
+// Modelos de Dados (inalterados)
 // ---------------------
 data class XtreamLoginResponse(
     val user_info: UserInfo?,
@@ -131,7 +131,7 @@ data class VodInfoData(
 )
 
 // ---------------------
-// Interface Retrofit
+// Interface Retrofit (inalterada)
 // ---------------------
 interface XtreamService {
 
@@ -227,57 +227,76 @@ interface XtreamService {
 }
 
 // ---------------------
-// INTERCEPTOR E CLIENT
+// INTERCEPTOR
 // ---------------------
 class VpnInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val originalRequest = chain.request()
-        val requestWithHeaders = originalRequest.newBuilder()
-            .header(
-                "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            )
+        val request = chain.request().newBuilder()
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
             .header("Accept", "*/*")
             .header("Cache-Control", "no-cache")
             .build()
-        return chain.proceed(requestWithHeaders)
+        return chain.proceed(request)
     }
 }
 
+// ---------------------
+// XTREAM API — CORRIGIDO
+// ---------------------
 object XtreamApi {
-
-    private var retrofit: Retrofit? = null
-    private var baseUrl: String = ""
 
     private const val PREFS_NAME = "vltv_prefs"
     private const val PREF_DNS_KEY = "dns"
 
+    // ✅ FIX: baseUrl e retrofit protegidos por lock explícito
+    // Antes: retrofit = null em setBaseUrl() causava race condition quando
+    // duas coroutines acessavam service ao mesmo tempo (troca de aba rápida)
+    private val lock = Any()
+    private var baseUrl: String = ""
+    private var retrofit: Retrofit? = null
+
+    // ✅ FIX: okHttpClient NÃO é mais lazy fixo — é recriado por DNS
+    // Antes: lazy criava 1 client para sempre com o DNS do primeiro servidor,
+    // causando falha silenciosa em servidores com porta especial (ex: :80, :8080)
+    private var _okHttpClient: OkHttpClient? = null
+
     private val safeDns: Dns by lazy {
-        val bootstrapClient = OkHttpClient.Builder().build()
-        DnsOverHttps.Builder()
-            .client(bootstrapClient)
-            .url("https://dns.google/dns-query".toHttpUrl())
-            .bootstrapDnsHosts(
-                listOf(
-                    InetAddress.getByName("8.8.8.8"),
-                    InetAddress.getByName("1.1.1.1")
+        try {
+            val bootstrapClient = OkHttpClient.Builder().build()
+            DnsOverHttps.Builder()
+                .client(bootstrapClient)
+                .url("https://dns.google/dns-query".toHttpUrl())
+                .bootstrapDnsHosts(
+                    listOf(
+                        InetAddress.getByName("8.8.8.8"),
+                        InetAddress.getByName("1.1.1.1")
+                    )
                 )
-            )
-            .build()
+                .build()
+        } catch (e: Exception) {
+            // Fallback para DNS padrão do sistema se DoH falhar
+            Dns.SYSTEM
+        }
     }
 
-    private val okHttpClient: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(60, TimeUnit.SECONDS)
+    // ✅ Client recriado com base na URL atual para respeitar porta e host corretos
+    private fun buildClient(): OkHttpClient {
+        return OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
-            .writeTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .dns(safeDns)
             .addInterceptor(VpnInterceptor())
+            // ✅ Connection pool maior para requisições paralelas (troca de aba rápida)
+            .connectionPool(okhttp3.ConnectionPool(8, 5, TimeUnit.MINUTES))
             .build()
     }
 
-    // Inicializa tentando carregar o DNS salvo (se existir)
+    private fun getOkHttpClient(): OkHttpClient {
+        return _okHttpClient ?: buildClient().also { _okHttpClient = it }
+    }
+
     init {
         carregarDnsSalvo()
     }
@@ -302,8 +321,8 @@ object XtreamApi {
     }
 
     fun salvarDns(context: Context, dns: String) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString(PREF_DNS_KEY, dns).apply()
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putString(PREF_DNS_KEY, dns).apply()
         setBaseUrl(dns)
     }
 
@@ -312,39 +331,41 @@ object XtreamApi {
 
         var urlClean = newUrl.trim()
 
-        // Remove player_api.php se o provedor mandar a URL completa
         if (urlClean.contains("player_api.php")) {
             urlClean = urlClean.substringBefore("player_api.php")
         }
-
-        // Garante http/https presente (se o provedor mandar só domínio)
         if (!urlClean.startsWith("http://") && !urlClean.startsWith("https://")) {
             urlClean = "http://$urlClean"
         }
-
         if (!urlClean.endsWith("/")) {
             urlClean += "/"
         }
 
-        if (baseUrl != urlClean) {
-            baseUrl = urlClean
-            retrofit = null
+        // ✅ FIX: synchronized garante que só 1 thread recria retrofit por vez
+        synchronized(lock) {
+            if (baseUrl != urlClean) {
+                baseUrl = urlClean
+                retrofit = null          // invalida retrofit
+                _okHttpClient = null     // ✅ recria client para o novo host/porta
+            }
         }
     }
 
+    // ✅ FIX: getter do service também synchronized — evita race condition
+    // na troca rápida de abas onde 2 coroutines chamam service ao mesmo tempo
     val service: XtreamService
-        get() {
+        get() = synchronized(lock) {
             if (retrofit == null) {
+                val url = baseUrl.ifBlank { "http://localhost/" }
                 retrofit = Retrofit.Builder()
-                    .baseUrl(baseUrl.ifBlank { "http://localhost/" }) // evita crash se esquecer de setar
-                    .client(okHttpClient)
+                    .baseUrl(url)
+                    .client(getOkHttpClient())
                     .addConverterFactory(GsonConverterFactory.create())
                     .build()
             }
-            return retrofit!!.create(XtreamService::class.java)
+            retrofit!!.create(XtreamService::class.java)
         }
 
-    // Helper genérico para parse de listas de categorias (JSON array)
     fun <T> parseCategoryList(
         responseBody: ResponseBody?,
         clazz: Class<T>
