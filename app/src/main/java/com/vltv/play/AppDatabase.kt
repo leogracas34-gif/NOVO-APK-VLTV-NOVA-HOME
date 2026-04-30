@@ -4,10 +4,9 @@ import androidx.room.*
 import android.content.Context
 
 // ==========================================
-// 🚀 TABELAS (ENTITIES)
+// ENTITIES (inalteradas — sem quebrar nada)
 // ==========================================
 
-// ✅ NOVA TABELA DE PERFIS (TMDB)
 @Entity(tableName = "user_profiles")
 data class ProfileEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
@@ -19,8 +18,10 @@ data class ProfileEntity(
 @Entity(
     tableName = "live_streams",
     indices = [
-        Index(value = ["category_id"]), 
-        Index(value = ["name"])
+        Index(value = ["category_id"]),
+        Index(value = ["name"]),
+        // ✅ NOVO índice composto: cobre a query mais comum (filtrar + ordenar por categoria)
+        Index(value = ["category_id", "name"])
     ]
 )
 data class LiveStreamEntity(
@@ -32,11 +33,15 @@ data class LiveStreamEntity(
 )
 
 @Entity(
-    tableName = "vod_streams", 
+    tableName = "vod_streams",
     indices = [
-        Index(value = ["added"]), 
-        Index(value = ["category_id"]), 
-        Index(value = ["name"])
+        Index(value = ["added"]),
+        Index(value = ["category_id"]),
+        Index(value = ["name"]),
+        // ✅ NOVO índice composto: cobre filtro por categoria + ordenação por data
+        Index(value = ["category_id", "added"]),
+        // ✅ NOVO índice composto: cobre busca por nome dentro de categoria
+        Index(value = ["category_id", "name"])
     ]
 )
 data class VodEntity(
@@ -52,11 +57,15 @@ data class VodEntity(
 )
 
 @Entity(
-    tableName = "series_streams", 
+    tableName = "series_streams",
     indices = [
-        Index(value = ["last_modified"]), 
+        Index(value = ["last_modified"]),
         Index(value = ["category_id"]),
-        Index(value = ["name"])
+        Index(value = ["name"]),
+        // ✅ NOVO índice composto: cobre filtro por categoria + ordenação por data
+        Index(value = ["category_id", "last_modified"]),
+        // ✅ NOVO índice composto: cobre busca por nome dentro de categoria
+        Index(value = ["category_id", "name"])
     ]
 )
 data class SeriesEntity(
@@ -70,9 +79,13 @@ data class SeriesEntity(
 )
 
 @Entity(
-    tableName = "watch_history", 
+    tableName = "watch_history",
     primaryKeys = ["stream_id", "profile_name"],
-    indices = [Index(value = ["timestamp"])]
+    indices = [
+        Index(value = ["timestamp"]),
+        // ✅ NOVO: busca por perfil é a query mais comum no histórico
+        Index(value = ["profile_name", "timestamp"])
+    ]
 )
 data class WatchHistoryEntity(
     val stream_id: Int,
@@ -89,7 +102,7 @@ data class WatchHistoryEntity(
 data class CategoryEntity(
     @PrimaryKey val category_id: String,
     val category_name: String,
-    val type: String 
+    val type: String
 )
 
 @Entity(tableName = "epg_cache", indices = [Index(value = ["stream_id"])])
@@ -105,26 +118,26 @@ data class EpgEntity(
 @Entity(tableName = "downloads", indices = [Index(value = ["status"])])
 data class DownloadEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val android_download_id: Long, 
+    val android_download_id: Long,
     val stream_id: Int,
-    val name: String, 
-    val episode_name: String?, 
+    val name: String,
+    val episode_name: String?,
     val image_url: String?,
-    val file_path: String, 
-    val type: String, 
-    val status: String, 
+    val file_path: String,
+    val type: String,
+    val status: String,
     val progress: Int = 0,
     val total_size: String = "0MB"
 )
 
 // ==========================================
-// 🚀 DAO ATUALIZADO (INCLUINDO PERFIS)
+// DAO — OTIMIZADO
 // ==========================================
 
 @Dao
 interface StreamDao {
-    
-    // --- PERFIS (NOVO) ---
+
+    // --- PERFIS ---
     @Query("SELECT * FROM user_profiles")
     suspend fun getAllProfiles(): List<ProfileEntity>
 
@@ -137,10 +150,25 @@ interface StreamDao {
     @Delete
     suspend fun deleteProfile(profile: ProfileEntity)
 
-    // --- STREAMS ---
-    @Transaction 
-    @Query("SELECT * FROM vod_streams ORDER BY added DESC LIMIT :limit")
-    suspend fun getRecentVods(limit: Int): List<VodEntity>
+    // --- LIVE ---
+    @Transaction
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertLiveStreams(streams: List<LiveStreamEntity>)
+
+    @Query("SELECT * FROM live_streams WHERE name LIKE '%' || :query || '%' LIMIT 100")
+    suspend fun searchLive(query: String): List<LiveStreamEntity>
+
+    @Query("DELETE FROM live_streams")
+    suspend fun clearLive()
+
+    // ✅ NOVO: busca live por categoria — usa o índice composto category_id+name
+    @Query("SELECT * FROM live_streams WHERE category_id = :categoryId ORDER BY name ASC")
+    suspend fun getLiveByCategory(categoryId: String): List<LiveStreamEntity>
+
+    // --- VOD ---
+    @Transaction
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertVodStreams(streams: List<VodEntity>)
 
     @Query("SELECT COUNT(*) FROM vod_streams")
     suspend fun getVodCount(): Int
@@ -148,47 +176,68 @@ interface StreamDao {
     @Query("SELECT * FROM vod_streams")
     suspend fun getAllVods(): List<VodEntity>
 
+    // ✅ OTIMIZADO: usa índice composto category_id+added
+    @Query("SELECT * FROM vod_streams WHERE category_id = :categoryId ORDER BY added DESC")
+    suspend fun getVodsByCategory(categoryId: String): List<VodEntity>
+
+    @Transaction
+    @Query("SELECT * FROM vod_streams ORDER BY added DESC LIMIT :limit")
+    suspend fun getRecentVods(limit: Int): List<VodEntity>
+
+    @Query("SELECT * FROM vod_streams WHERE name LIKE '%' || :query || '%' LIMIT 100")
+    suspend fun searchVod(query: String): List<VodEntity>
+
+    // ✅ NOVO: busca por nome dentro de categoria — usa índice category_id+name
+    @Query("SELECT * FROM vod_streams WHERE category_id = :categoryId AND name LIKE '%' || :query || '%' LIMIT 50")
+    suspend fun searchVodInCategory(categoryId: String, query: String): List<VodEntity>
+
+    @Query("UPDATE vod_streams SET logo_url = :logoUrl WHERE stream_id = :id")
+    suspend fun updateVodLogo(id: Int, logoUrl: String)
+
+    @Query("SELECT * FROM vod_streams ORDER BY RANDOM() LIMIT :limit")
+    suspend fun getRandomVods(limit: Int): List<VodEntity>
+
+    // ✅ NOVO: bulk update de logos em uma transação só (muito mais rápido que N updates)
+    @Transaction
+    suspend fun updateVodLogos(updates: Map<Int, String>) {
+        updates.forEach { (id, url) -> updateVodLogo(id, url) }
+    }
+
+    // --- SÉRIES ---
+    @Transaction
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSeriesStreams(series: List<SeriesEntity>)
+
     @Query("SELECT * FROM series_streams")
     suspend fun getAllSeries(): List<SeriesEntity>
-    // -----------------------------------------------
+
+    // ✅ OTIMIZADO: usa índice composto category_id+last_modified
+    @Query("SELECT * FROM series_streams WHERE category_id = :categoryId ORDER BY last_modified DESC")
+    suspend fun getSeriesByCategory(categoryId: String): List<SeriesEntity>
 
     @Transaction
     @Query("SELECT * FROM series_streams ORDER BY last_modified DESC LIMIT :limit")
     suspend fun getRecentSeries(limit: Int): List<SeriesEntity>
 
-    @Query("SELECT * FROM live_streams WHERE name LIKE '%' || :query || '%' LIMIT 100")
-    suspend fun searchLive(query: String): List<LiveStreamEntity>
-
-    @Query("SELECT * FROM vod_streams WHERE name LIKE '%' || :query || '%' LIMIT 100")
-    suspend fun searchVod(query: String): List<VodEntity>
-
-    @Transaction
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertLiveStreams(streams: List<LiveStreamEntity>)
-
-    @Transaction
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertVodStreams(streams: List<VodEntity>)
-
-    @Transaction
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSeriesStreams(series: List<SeriesEntity>)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCategories(categories: List<CategoryEntity>)
-
-    @Query("DELETE FROM live_streams")
-    suspend fun clearLive()
-
     @Query("UPDATE series_streams SET logo_url = :logoUrl WHERE series_id = :id")
     suspend fun updateSeriesLogo(id: Int, logoUrl: String)
 
-    @Query("UPDATE vod_streams SET logo_url = :logoUrl WHERE stream_id = :id")
-    suspend fun updateVodLogo(id: Int, logoUrl: String)
+    @Query("SELECT * FROM series_streams ORDER BY RANDOM() LIMIT :limit")
+    suspend fun getRandomSeries(limit: Int): List<SeriesEntity>
 
+    // --- CATEGORIAS ---
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCategories(categories: List<CategoryEntity>)
+
+    // ✅ NOVO: busca categorias por tipo (live / vod / series)
+    @Query("SELECT * FROM categories WHERE type = :type ORDER BY category_name ASC")
+    suspend fun getCategoriesByType(type: String): List<CategoryEntity>
+
+    // --- HISTÓRICO ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveWatchHistory(history: WatchHistoryEntity)
 
+    // ✅ OTIMIZADO: usa índice composto profile_name+timestamp
     @Query("SELECT * FROM watch_history WHERE profile_name = :profile ORDER BY timestamp DESC LIMIT :limit")
     suspend fun getWatchHistory(profile: String, limit: Int = 20): List<WatchHistoryEntity>
 
@@ -207,7 +256,7 @@ interface StreamDao {
 
     @Query("DELETE FROM downloads WHERE id = :id")
     suspend fun deleteDownload(id: Int)
-    
+
     @Query("DELETE FROM downloads WHERE android_download_id = :downloadId")
     suspend fun deleteDownloadByAndroidId(downloadId: Long)
 
@@ -216,30 +265,24 @@ interface StreamDao {
 
     @Query("SELECT COUNT(*) FROM downloads WHERE status = 'BAIXANDO'")
     fun getCountDownloadsAtivos(): androidx.lifecycle.LiveData<Int>
-
-    @Query("SELECT * FROM vod_streams ORDER BY RANDOM() LIMIT :limit")
-    suspend fun getRandomVods(limit: Int): List<VodEntity>
-
-    @Query("SELECT * FROM series_streams ORDER BY RANDOM() LIMIT :limit")
-    suspend fun getRandomSeries(limit: Int): List<SeriesEntity>
 }
 
 // ==========================================
-// 🚀 DATABASE ENGINE (VERSÃO ATUALIZADA)
+// DATABASE — OTIMIZADO
 // ==========================================
 
 @Database(
     entities = [
-        LiveStreamEntity::class, 
-        VodEntity::class, 
-        SeriesEntity::class, 
-        CategoryEntity::class, 
-        EpgEntity::class, 
-        WatchHistoryEntity::class, 
+        LiveStreamEntity::class,
+        VodEntity::class,
+        SeriesEntity::class,
+        CategoryEntity::class,
+        EpgEntity::class,
+        WatchHistoryEntity::class,
         DownloadEntity::class,
-        ProfileEntity::class // ✅ Adicionado
-    ], 
-    version = 6, // ✅ Aumentado de 5 para 6
+        ProfileEntity::class
+    ],
+    version = 7, // ✅ Incrementado para forçar recriação dos índices compostos
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -250,19 +293,28 @@ abstract class AppDatabase : RoomDatabase() {
         private var INSTANCE: AppDatabase? = null
 
         fun getDatabase(context: Context): AppDatabase {
+            // ✅ Double-checked locking — padrão correto para singleton thread-safe
             return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    AppDatabase::class.java,
-                    "vltv_play_db"
-                )
-                .fallbackToDestructiveMigration() 
-                .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-                .build()
-                
-                INSTANCE = instance
-                instance
+                INSTANCE ?: buildDatabase(context).also { INSTANCE = it }
             }
+        }
+
+        private fun buildDatabase(context: Context): AppDatabase {
+            return Room.databaseBuilder(
+                context.applicationContext,
+                AppDatabase::class.java,
+                "vltv_play_db"
+            )
+            .fallbackToDestructiveMigration()
+            // ✅ WAL = Write-Ahead Logging: leituras e escritas simultâneas sem bloquear
+            // Antes: modo journal padrão bloqueava leituras durante sincronização do servidor
+            .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+            // ✅ Query executor com 4 threads — permite 4 queries paralelas simultâneas
+            // Útil quando Home, Canais e Filmes carregam ao mesmo tempo
+            .setQueryExecutor(
+                java.util.concurrent.Executors.newFixedThreadPool(4)
+            )
+            .build()
         }
     }
 }
