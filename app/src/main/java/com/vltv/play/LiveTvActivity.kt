@@ -21,20 +21,18 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DecodeFormat
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.Priority
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 import java.nio.charset.Charset
-
-// --- AS ÚNICAS IMPORTAÇÕES ADICIONADAS ---
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-// --- ADICIONADO PARA SUPORTE AOS 6 DNS E GSON ---
 import okhttp3.ResponseBody
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -50,21 +48,27 @@ class LiveTvActivity : AppCompatActivity() {
     private var username = ""
     private var password = ""
 
-    // Mantendo a estrutura original do seu cache
     private var cachedCategories: List<LiveCategory>? = null
-    
-    // IMPORTANTE: Alterado para String para evitar o erro de tipos no Cache
-    private val channelsCache = mutableMapOf<String, List<LiveStream>>() 
+    private val channelsCache = mutableMapOf<String, List<LiveStream>>()
 
     private var categoryAdapter: CategoryAdapter? = null
     private var channelAdapter: ChannelAdapter? = null
+
+    // ✅ Detecta se é TV para ajustar zoom e colunas
+    private fun isTvDevice(): Boolean {
+        return packageManager.hasSystemFeature("android.software.leanback") ||
+               packageManager.hasSystemFeature("android.hardware.type.television") ||
+               (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_TYPE_MASK) ==
+               android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_live_tv)
 
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
-        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        windowInsetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
 
         rvCategories = findViewById(R.id.rvCategories)
@@ -76,39 +80,37 @@ class LiveTvActivity : AppCompatActivity() {
         username = prefs.getString("username", "") ?: ""
         password = prefs.getString("password", "") ?: ""
 
-        // Configuração de Foco
         setupRecyclerFocus()
 
         rvCategories.layoutManager = LinearLayoutManager(this, RecyclerView.VERTICAL, false)
         rvCategories.setHasFixedSize(true)
-        rvCategories.setItemViewCacheSize(50) // ✅ AUMENTO DE CACHE PARA NAVEGAÇÃO RÁPIDA
-        rvCategories.overScrollMode = View.OVER_SCROLL_NEVER // ✅ REMOVE TREMEDIRA NO FINAL
-
+        rvCategories.setItemViewCacheSize(50)
+        rvCategories.overScrollMode = View.OVER_SCROLL_NEVER
         rvCategories.isFocusable = true
         rvCategories.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
 
-        // Mantendo o GridLayoutManager (4 colunas)
-        rvChannels.layoutManager = GridLayoutManager(this, 4)
+        // ✅ Colunas adaptadas: 5 na TV, 4 no celular
+        val colunas = if (isTvDevice()) 5 else 4
+        rvChannels.layoutManager = GridLayoutManager(this, colunas)
         rvChannels.isFocusable = true
         rvChannels.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         rvChannels.setHasFixedSize(true)
-        rvChannels.setItemViewCacheSize(100) // ✅ CACHE EXTRA PARA EVITAR TRAVAMENTO NOS CANAIS
+        rvChannels.setItemViewCacheSize(100)
 
         rvCategories.requestFocus()
-
         carregarCategorias()
     }
 
-    // ✅ FUNÇÃO DE VELOCIDADE ADICIONADA
     private fun preLoadChannelLogos(canais: List<LiveStream>) {
         CoroutineScope(Dispatchers.IO).launch {
-            val limit = if (canais.size > 40) 40 else canais.size
+            val limit = minOf(canais.size, 40)
             for (i in 0 until limit) {
                 val url = canais[i].icon
                 if (!url.isNullOrEmpty()) {
                     withContext(Dispatchers.Main) {
                         Glide.with(this@LiveTvActivity)
                             .load(url)
+                            .format(DecodeFormat.PREFER_ARGB_8888) // ✅ HD
                             .diskCacheStrategy(DiskCacheStrategy.ALL)
                             .priority(Priority.LOW)
                             .preload()
@@ -120,179 +122,117 @@ class LiveTvActivity : AppCompatActivity() {
 
     private fun setupRecyclerFocus() {
         rvCategories.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                rvCategories.smoothScrollToPosition(0)
-            }
+            if (hasFocus) rvCategories.smoothScrollToPosition(0)
         }
-        
         rvChannels.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                rvChannels.smoothScrollToPosition(0)
-            }
+            if (hasFocus) rvChannels.smoothScrollToPosition(0)
         }
     }
 
     private fun isAdultName(name: String?): Boolean {
         if (name.isNullOrBlank()) return false
         val n = name.lowercase()
-        return n.contains("+18") ||
-                n.contains("adult") ||
-                n.contains("xxx") ||
-                n.contains("hot") ||
-                n.contains("sexo")
+        return n.contains("+18") || n.contains("adult") || n.contains("xxx") ||
+               n.contains("hot") || n.contains("sexo")
     }
 
     private fun carregarCategorias() {
-        cachedCategories?.let { categorias ->
-            aplicarCategorias(categorias)
-            return
-        }
+        cachedCategories?.let { aplicarCategorias(it); return }
 
         progressBar.visibility = View.VISIBLE
 
         XtreamApi.service.getLiveCategories(username, password)
             .enqueue(object : Callback<ResponseBody> {
-                override fun onResponse(
-                    call: Call<ResponseBody>,
-                    response: Response<ResponseBody>
-                ) {
+                override fun onResponse(call: Call<ResponseBody>, response: Response<ResponseBody>) {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
                         try {
                             val rawJson = response.body()!!.string()
-                            val listaProcessada = mutableListOf<LiveCategory>()
+                            val lista = mutableListOf<LiveCategory>()
                             val gson = Gson()
 
                             if (rawJson.trim().startsWith("[")) {
                                 val listType = object : TypeToken<List<LiveCategory>>() {}.type
-                                val list: List<LiveCategory> = gson.fromJson(rawJson, listType)
-                                listaProcessada.addAll(list)
+                                lista.addAll(gson.fromJson(rawJson, listType))
                             } else if (rawJson.trim().startsWith("{")) {
-                                val jsonObject = JSONObject(rawJson)
-                                val keys = jsonObject.keys()
+                                val obj = JSONObject(rawJson)
+                                val keys = obj.keys()
                                 while (keys.hasNext()) {
-                                    val key = keys.next()
-                                    val catJson = jsonObject.getJSONObject(key).toString()
-                                    val category: LiveCategory = gson.fromJson(catJson, LiveCategory::class.java)
-                                    listaProcessada.add(category)
+                                    lista.add(gson.fromJson(obj.getJSONObject(keys.next()).toString(), LiveCategory::class.java))
                                 }
                             }
 
-                            var categorias: List<LiveCategory> = listaProcessada
+                            cachedCategories = lista
+                            val filtradas = if (ParentalControlManager.isEnabled(this@LiveTvActivity))
+                                lista.filterNot { isAdultName(it.name) } else lista
 
-                            cachedCategories = categorias
-
-                            if (ParentalControlManager.isEnabled(this@LiveTvActivity)) {
-                                categorias = categorias.filterNot { cat ->
-                                    isAdultName(cat.name)
-                                }.toMutableList() // ✅ CORREÇÃO: Converte para lista mutável para evitar erro de tipo
-                            }
-
-                            aplicarCategorias(categorias)
+                            aplicarCategorias(filtradas)
                         } catch (e: Exception) {
                             e.printStackTrace()
                             Toast.makeText(this@LiveTvActivity, "Erro no formato dos dados", Toast.LENGTH_SHORT).show()
                         }
                     } else {
-                        Toast.makeText(
-                            this@LiveTvActivity,
-                            "Erro ao carregar categorias",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        Toast.makeText(this@LiveTvActivity, "Erro ao carregar categorias", Toast.LENGTH_SHORT).show()
                     }
                 }
-
                 override fun onFailure(call: Call<ResponseBody>, t: Throwable) {
                     progressBar.visibility = View.GONE
-                    Toast.makeText(
-                        this@LiveTvActivity,
-                        "Falha de conexão",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this@LiveTvActivity, "Falha de conexão", Toast.LENGTH_SHORT).show()
                 }
             })
     }
 
     private fun aplicarCategorias(categorias: List<LiveCategory>) {
         if (categorias.isEmpty()) {
-            Toast.makeText(
-                this@LiveTvActivity,
-                "Nenhuma categoria disponível.",
-                Toast.LENGTH_SHORT
-            ).show()
+            Toast.makeText(this, "Nenhuma categoria disponível.", Toast.LENGTH_SHORT).show()
             rvCategories.adapter = CategoryAdapter(emptyList()) {}
             rvChannels.adapter = ChannelAdapter(emptyList(), username, password) {}
             return
         }
-
-        categoryAdapter = CategoryAdapter(categorias) { categoria ->
-            carregarCanais(categoria)
-        }
+        categoryAdapter = CategoryAdapter(categorias) { carregarCanais(it) }
         rvCategories.adapter = categoryAdapter
-
         carregarCanais(categorias[0])
     }
 
     private fun carregarCanais(categoria: LiveCategory) {
         tvCategoryTitle.text = categoria.name
-
-        // Correção aqui: Converter ID para String para usar no Cache corretamente
         val catIdStr = categoria.id.toString()
 
-        channelsCache[catIdStr]?.let { canaisCacheadas ->
-            aplicarCanais(categoria, canaisCacheadas)
-            preLoadChannelLogos(canaisCacheadas) // ✅ CHAMADA ADICIONADA NO CACHE
+        channelsCache[catIdStr]?.let {
+            aplicarCanais(categoria, it)
+            preLoadChannelLogos(it)
             return
         }
 
         progressBar.visibility = View.VISIBLE
 
-        // Correção aqui: Passar categoryId como String
         XtreamApi.service.getLiveStreams(username, password, categoryId = catIdStr)
             .enqueue(object : Callback<List<LiveStream>> {
-                override fun onResponse(
-                    call: Call<List<LiveStream>>,
-                    response: Response<List<LiveStream>>
-                ) {
+                override fun onResponse(call: Call<List<LiveStream>>, response: Response<List<LiveStream>>) {
                     progressBar.visibility = View.GONE
                     if (response.isSuccessful && response.body() != null) {
                         var canais = response.body()!!
-
                         channelsCache[catIdStr] = canais
-
                         if (ParentalControlManager.isEnabled(this@LiveTvActivity)) {
-                            canais = canais.filterNot { canal ->
-                                isAdultName(canal.name)
-                            }
+                            canais = canais.filterNot { isAdultName(it.name) }
                         }
-
                         aplicarCanais(categoria, canais)
-                        preLoadChannelLogos(canais) // ✅ CHAMADA ADICIONADA NA API
+                        preLoadChannelLogos(canais)
                     } else {
-                        Toast.makeText(
-                            this@LiveTvActivity,
-                            "Erro ao carregar canais",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        Toast.makeText(this@LiveTvActivity, "Erro ao carregar canais", Toast.LENGTH_SHORT).show()
                     }
                 }
-
                 override fun onFailure(call: Call<List<LiveStream>>, t: Throwable) {
                     progressBar.visibility = View.GONE
-                    Toast.makeText(
-                        this@LiveTvActivity,
-                        "Falha de conexão",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this@LiveTvActivity, "Falha de conexão", Toast.LENGTH_SHORT).show()
                 }
             })
     }
 
     private fun aplicarCanais(categoria: LiveCategory, canais: List<LiveStream>) {
         tvCategoryTitle.text = categoria.name
-
         channelAdapter = ChannelAdapter(canais, username, password) { canal ->
-            val intent = Intent(this@LiveTvActivity, PlayerActivity::class.java)
+            val intent = Intent(this, PlayerActivity::class.java)
             intent.putExtra("stream_id", canal.id)
             intent.putExtra("stream_ext", "ts")
             intent.putExtra("stream_type", "live")
@@ -302,9 +242,7 @@ class LiveTvActivity : AppCompatActivity() {
         rvChannels.adapter = channelAdapter
     }
 
-    // --------------------
-    // ADAPTER DAS CATEGORIAS (COM FOCO NEON)
-    // --------------------
+    // ─── ADAPTER CATEGORIAS ──────────────────────────────────────────────────
     inner class CategoryAdapter(
         private val list: List<LiveCategory>,
         private val onClick: (LiveCategory) -> Unit
@@ -314,26 +252,24 @@ class LiveTvActivity : AppCompatActivity() {
 
         inner class VH(v: View) : RecyclerView.ViewHolder(v) {
             val tvName: TextView = v.findViewById(R.id.tvName)
+            val viewIndicator: View? = try { v.findViewById(R.id.viewIndicator) } catch (e: Exception) { null }
         }
 
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val v = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_category, parent, false)
-            return VH(v)
-        }
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
+            VH(LayoutInflater.from(parent.context).inflate(R.layout.item_category, parent, false))
 
         override fun onBindViewHolder(holder: VH, position: Int) {
             val item = list[position]
             holder.tvName.text = item.name
-
-            // Logica de cor original preservada, mas integrada ao FocusListener
-            atualizarEstiloCategoria(holder, position == selectedPos, false)
+            atualizarEstilo(holder, position == selectedPos, false)
 
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
+            // ✅ FIX DUPLO CLIQUE: false no celular, true só na TV
+            holder.itemView.isFocusableInTouchMode = isTvDevice()
 
             holder.itemView.setOnFocusChangeListener { _, hasFocus ->
-                atualizarEstiloCategoria(holder, selectedPos == position, hasFocus)
+                atualizarEstilo(holder, selectedPos == position, hasFocus)
             }
 
             holder.itemView.setOnClickListener {
@@ -344,20 +280,28 @@ class LiveTvActivity : AppCompatActivity() {
             }
         }
 
-        private fun atualizarEstiloCategoria(holder: VH, isSelected: Boolean, hasFocus: Boolean) {
-            if (hasFocus) {
-                holder.tvName.setTextColor(Color.YELLOW)
-                holder.itemView.setBackgroundResource(R.drawable.bg_focus_neon)
-                holder.itemView.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
-            } else {
-                holder.itemView.setBackgroundResource(0)
-                holder.itemView.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-                if (isSelected) {
-                    holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.red_primary))
-                    holder.tvName.setBackgroundColor(0xFF252525.toInt())
-                } else {
-                    holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.gray_text))
-                    holder.tvName.setBackgroundColor(0x00000000)
+        private fun atualizarEstilo(holder: VH, isSelected: Boolean, hasFocus: Boolean) {
+            when {
+                hasFocus -> {
+                    holder.tvName.setTextColor(Color.YELLOW)
+                    holder.tvName.textSize = 13f
+                    holder.itemView.setBackgroundResource(R.drawable.bg_focus_neon)
+                    holder.itemView.animate().scaleX(1.04f).scaleY(1.04f).setDuration(150).start()
+                    holder.viewIndicator?.visibility = View.VISIBLE
+                }
+                isSelected -> {
+                    holder.tvName.setTextColor(Color.WHITE)
+                    holder.tvName.textSize = 12f
+                    holder.itemView.setBackgroundColor(0x22FFFFFF)
+                    holder.itemView.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    holder.viewIndicator?.visibility = View.VISIBLE
+                }
+                else -> {
+                    holder.tvName.setTextColor(0x88FFFFFF.toInt())
+                    holder.tvName.textSize = 12f
+                    holder.itemView.setBackgroundColor(0x00000000)
+                    holder.itemView.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    holder.viewIndicator?.visibility = View.INVISIBLE
                 }
             }
         }
@@ -365,9 +309,7 @@ class LiveTvActivity : AppCompatActivity() {
         override fun getItemCount() = list.size
     }
 
-    // --------------------
-    // ADAPTER DOS CANAIS (COM FOCO NEON + ZOOM 1.15f)
-    // --------------------
+    // ─── ADAPTER CANAIS ──────────────────────────────────────────────────────
     inner class ChannelAdapter(
         private val list: List<LiveStream>,
         private val username: String,
@@ -377,6 +319,9 @@ class LiveTvActivity : AppCompatActivity() {
 
         private val epgCache = mutableMapOf<Int, List<EpgResponseItem>>()
 
+        // ✅ Zoom adaptado: menor no celular, maior na TV
+        private val zoomFocus = if (isTvDevice()) 1.12f else 1.04f
+
         inner class VH(v: View) : RecyclerView.ViewHolder(v) {
             val tvName: TextView = v.findViewById(R.id.tvName)
             val tvNow: TextView = v.findViewById(R.id.tvNow)
@@ -384,44 +329,42 @@ class LiveTvActivity : AppCompatActivity() {
             val imgLogo: ImageView = v.findViewById(R.id.imgLogo)
         }
 
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val v = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_channel, parent, false)
-            return VH(v)
-        }
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
+            VH(LayoutInflater.from(parent.context).inflate(R.layout.item_channel, parent, false))
 
         override fun onBindViewHolder(holder: VH, position: Int) {
             val item = list[position]
-
             holder.tvName.text = item.name
 
+            // ✅ HD: logo em qualidade máxima com fade suave
             Glide.with(holder.itemView.context)
                 .load(item.icon)
+                .format(DecodeFormat.PREFER_ARGB_8888)
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
                 .priority(Priority.HIGH)
+                .transition(DrawableTransitionOptions.withCrossFade(150))
                 .placeholder(R.drawable.bg_logo_placeholder)
                 .error(R.drawable.bg_logo_placeholder)
-                .centerCrop()
+                .fitCenter()
                 .into(holder.imgLogo)
 
             carregarEpg(holder, item)
 
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
+            // ✅ FIX DUPLO CLIQUE: desativa focusableInTouchMode no celular
+            holder.itemView.isFocusableInTouchMode = isTvDevice()
 
-            // ✅ APLICAÇÃO DO FOCO NEON + ZOOM 1.15f + TEXTO MAIOR
             holder.itemView.setOnFocusChangeListener { view, hasFocus ->
                 if (hasFocus) {
                     holder.tvName.setTextColor(Color.YELLOW)
-                    holder.tvName.textSize = 20f // ✅ AUMENTO DO NOME DO CANAL NA TV
                     view.setBackgroundResource(R.drawable.bg_focus_neon)
-                    view.animate().scaleX(1.15f).scaleY(1.15f).setDuration(200).start()
-                    view.elevation = 20f
+                    view.animate().scaleX(zoomFocus).scaleY(zoomFocus).setDuration(160).start()
+                    view.elevation = 16f
                 } else {
                     holder.tvName.setTextColor(Color.WHITE)
-                    holder.tvName.textSize = 16f // ✅ VOLTA AO TAMANHO PADRÃO
                     view.setBackgroundResource(0)
-                    view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(200).start()
+                    view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(160).start()
                     view.elevation = 4f
                 }
             }
@@ -431,45 +374,32 @@ class LiveTvActivity : AppCompatActivity() {
 
         private fun decodeBase64(text: String?): String {
             return try {
-                if (text.isNullOrEmpty()) "" else String(
-                    Base64.decode(text, Base64.DEFAULT),
-                    Charset.forName("UTF-8") 
-                )
-            } catch (e: Exception) {
-                text ?: ""
-            }
+                if (text.isNullOrEmpty()) ""
+                else String(Base64.decode(text, Base64.DEFAULT), Charset.forName("UTF-8"))
+            } catch (e: Exception) { text ?: "" }
         }
 
         private fun carregarEpg(holder: VH, canal: LiveStream) {
-            epgCache[canal.id]?.let { epg ->
-                mostrarEpg(holder, epg)
-                return
-            }
-
-            val epgId = canal.id.toString()
+            epgCache[canal.id]?.let { mostrarEpg(holder, it); return }
 
             XtreamApi.service.getShortEpg(
                 user = username,
                 pass = password,
-                streamId = epgId,
+                streamId = canal.id.toString(),
                 limit = 2
             ).enqueue(object : Callback<EpgWrapper> {
-                override fun onResponse(
-                    call: Call<EpgWrapper>,
-                    response: Response<EpgWrapper>
-                ) {
+                override fun onResponse(call: Call<EpgWrapper>, response: Response<EpgWrapper>) {
                     if (response.isSuccessful && response.body()?.epg_listings != null) {
                         val epg = response.body()!!.epg_listings!!
                         epgCache[canal.id] = epg
                         mostrarEpg(holder, epg)
                     } else {
-                        holder.tvNow.text = "Programação não disponível"
+                        holder.tvNow.text = ""
                         holder.tvNext.text = ""
                     }
                 }
-
                 override fun onFailure(call: Call<EpgWrapper>, t: Throwable) {
-                    holder.tvNow.text = "Programação não disponível"
+                    holder.tvNow.text = ""
                     holder.tvNext.text = ""
                 }
             })
@@ -477,17 +407,10 @@ class LiveTvActivity : AppCompatActivity() {
 
         private fun mostrarEpg(holder: VH, epg: List<EpgResponseItem>) {
             if (epg.isNotEmpty()) {
-                val agora = epg[0]
-                holder.tvNow.text = decodeBase64(agora.title)
-
-                if (epg.size > 1) {
-                    val proximo = epg[1]
-                    holder.tvNext.text = decodeBase64(proximo.title)
-                } else {
-                    holder.tvNext.text = ""
-                }
+                holder.tvNow.text = decodeBase64(epg[0].title)
+                holder.tvNext.text = if (epg.size > 1) decodeBase64(epg[1].title) else ""
             } else {
-                holder.tvNow.text = "Programação não disponível"
+                holder.tvNow.text = ""
                 holder.tvNext.text = ""
             }
         }
@@ -496,10 +419,7 @@ class LiveTvActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK) {
-            finish()
-            return true
-        }
+        if (keyCode == KeyEvent.KEYCODE_BACK) { finish(); return true }
         return super.onKeyDown(keyCode, event)
     }
 }
