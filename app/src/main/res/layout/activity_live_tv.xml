@@ -1,53 +1,123 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="horizontal"
-    android:background="@color/background_dark">
+    android:background="#060610">
 
-    <!-- MENU LATERAL -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/rvCategories"
-        android:layout_width="250dp"
+    <!-- ── Sidebar de categorias ── -->
+    <LinearLayout
+        android:layout_width="200dp"
         android:layout_height="match_parent"
-        android:background="#121212"
-        android:padding="8dp" />
+        android:orientation="vertical"
+        android:background="@drawable/bg_sidebar_live">
 
-    <!-- DIVISÓRIA -->
+        <!-- Header da sidebar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp"
+            android:paddingTop="16dp"
+            android:paddingBottom="12dp"
+            android:gravity="center_vertical">
+
+            <View
+                android:layout_width="3dp"
+                android:layout_height="16dp"
+                android:background="#E50914"
+                android:layout_marginEnd="8dp"/>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="CATEGORIAS"
+                android:textColor="#88FFFFFF"
+                android:textSize="9sp"
+                android:letterSpacing="0.20"
+                android:textStyle="bold"/>
+
+        </LinearLayout>
+
+        <!-- Divisor -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#1AFFFFFF"
+            android:layout_marginHorizontal="10dp"/>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/rvCategories"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingTop="6dp"
+            android:paddingBottom="8dp"
+            android:overScrollMode="never"
+            android:clipToPadding="false"/>
+
+    </LinearLayout>
+
+    <!-- Divisória fina -->
     <View
         android:layout_width="1dp"
         android:layout_height="match_parent"
-        android:background="#333333" />
+        android:background="#1AFFFFFF"/>
 
-    <!-- GRADE DE ITENS -->
+    <!-- ── Área principal de canais ── -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="14dp"
+        android:paddingBottom="8dp">
 
-        <!-- TÍTULO DA CATEGORIA -->
-        <TextView
-            android:id="@+id/tvCategoryTitle"
-            android:layout_width="wrap_content"
+        <!-- Header com título e loading -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Carregando Categorias..."
-            android:textColor="@color/white"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="16dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="12dp">
 
-        <ProgressBar
-            android:id="@+id/progressBar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:visibility="visible" />
+            <View
+                android:layout_width="3dp"
+                android:layout_height="20dp"
+                android:background="#E50914"
+                android:layout_marginEnd="10dp"/>
 
+            <TextView
+                android:id="@+id/tvCategoryTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Carregando..."
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.02"/>
+
+            <ProgressBar
+                android:id="@+id/progressBar"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:indeterminateTint="#E50914"
+                android:visibility="gone"/>
+
+        </LinearLayout>
+
+        <!-- Grade de canais -->
         <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/rvChannels"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent"
+            android:overScrollMode="never"
+            android:clipToPadding="false"/>
+
     </LinearLayout>
 
 </LinearLayout>
