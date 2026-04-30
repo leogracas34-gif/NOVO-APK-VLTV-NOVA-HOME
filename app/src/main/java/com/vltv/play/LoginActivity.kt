@@ -38,6 +38,7 @@ class LoginActivity : AppCompatActivity() {
         "http://blackzz.shop",
         "http://playchannels.shop",
         "http://dnsblackz.brstore.live",
+        "http://svn2.shop",
         "http://xppv.shop",
         "http://redeinternadestiny.top",
         "http://blackstartv.shop",
