@@ -21,6 +21,7 @@ import com.vltv.play.data.SeriesEntity
 import com.vltv.play.data.VodEntity
 import com.vltv.play.databinding.ActivityLoginBinding
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
@@ -53,9 +54,18 @@ class LoginActivity : AppCompatActivity() {
         "http://blackdeluxe.shop"
     )
 
-    private val client = OkHttpClient.Builder()
+    // Client rápido para fase paralela
+    private val clientRapido = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(false) // false aqui: paralelo já cobre falhas
+        .build()
+
+    // ✅ FIX: client lento reutilizável — NÃO cria um novo a cada chamada
+    // Antes (testarConexaoIndividualLento): criava OkHttpClient novo por servidor = vazamento de conexões
+    private val clientLento = OkHttpClient.Builder()
+        .connectTimeout(25, TimeUnit.SECONDS)
+        .readTimeout(25, TimeUnit.SECONDS)
         .retryOnConnectionFailure(true)
         .build()
 
@@ -136,7 +146,6 @@ class LoginActivity : AppCompatActivity() {
         binding.etUsername.requestFocus()
     }
 
-    // ✅ Animação dos pontinhos "." ".." "..."
     private fun iniciarAnimacaoPontinhos() {
         dotsJob = object : Runnable {
             override fun run() {
@@ -158,7 +167,6 @@ class LoginActivity : AppCompatActivity() {
         binding.etUsername.isEnabled = false
         binding.etPassword.isEnabled = false
         try { binding.layoutLoading?.visibility = View.VISIBLE } catch (e: Exception) {
-            // fallback para XML antigo
             binding.progressBar.visibility = View.VISIBLE
         }
         iniciarAnimacaoPontinhos()
@@ -187,7 +195,6 @@ class LoginActivity : AppCompatActivity() {
                     setContentView(binding.root)
                     aplicarModoImersivo()
                     mostrarLoading()
-
                     launch(Dispatchers.IO) {
                         preCarregarLoteMinimo(dns, user, pass)
                         withContext(Dispatchers.Main) { decidirProximaTela() }
@@ -203,27 +210,27 @@ class LoginActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             var dnsVencedor: String? = null
 
-            // ── Fase 1: todos em paralelo, timeout 20s ────────────────────
+            // ── Fase 1: todos os servidores em paralelo, pega o primeiro que responder ──
             try {
-                dnsVencedor = withTimeoutOrNull(20_000L) {
-                    val canal = kotlinx.coroutines.channels.Channel<String>(
-                        kotlinx.coroutines.channels.Channel.UNLIMITED
-                    )
-                    val jobs = SERVERS.map { url ->
-                        launch(Dispatchers.IO) {
-                            val r = testarConexaoIndividual(url, user, pass)
-                            if (r != null) canal.trySend(r)
-                        }
+                val canal = Channel<String>(Channel.UNLIMITED)
+                val jobs = SERVERS.map { url ->
+                    launch(Dispatchers.IO) {
+                        val r = testarServidor(url, user, pass, clientRapido)
+                        if (r != null) canal.trySend(r)
                     }
-                    // Aguarda o primeiro resultado
-                    val vencedor = withTimeoutOrNull(19_000L) { canal.receive() }
-                    jobs.forEach { it.cancel() }
-                    canal.close()
-                    vencedor
                 }
-            } catch (e: Exception) { e.printStackTrace() }
 
-            // ── Fase 2: fallback sequencial nos principais com timeout 25s ─
+                // Aguarda primeiro resultado com timeout de 18s
+                dnsVencedor = withTimeoutOrNull(18_000L) { canal.receive() }
+                jobs.forEach { it.cancel() }
+                canal.close()
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // ── Fase 2: fallback sequencial com timeout maior nos principais ──
+            // Só entra aqui se NENHUM servidor respondeu na fase 1
             if (dnsVencedor == null) {
                 val principais = listOf(
                     "http://fibercdn.sbs",
@@ -231,11 +238,14 @@ class LoginActivity : AppCompatActivity() {
                     "http://cmdbr.life",
                     "http://blackdns.shop",
                     "http://ranos.sbs",
+                    "http://tlfp.fun:80",
+                    "http://telefunplay.xyz:80",
                     "http://cmdtv.sbs",
                     "http://tvblack.shop"
                 )
                 for (servidor in principais) {
-                    val r = testarConexaoIndividualLento(servidor, user, pass)
+                    // ✅ FIX: usa clientLento reutilizável (não cria um novo por iteração)
+                    val r = testarServidor(servidor, user, pass, clientLento)
                     if (r != null) { dnsVencedor = r; break }
                 }
             }
@@ -246,8 +256,12 @@ class LoginActivity : AppCompatActivity() {
                 if (usuarioAnterior != null && usuarioAnterior != user) {
                     limparBancoPorTrocaDeUsuario()
                 }
-                salvarCredenciais(dnsVencedor, user, pass)
-                preCarregarLoteMinimo(dnsVencedor, user, pass)
+
+                // ✅ FIX: salva SEMPRE com barra no final para consistência com XtreamApi
+                val dnsFinal = normalizarBaseUrl(dnsVencedor)
+                salvarCredenciais(dnsFinal, user, pass)
+                preCarregarLoteMinimo(dnsFinal, user, pass)
+
                 withContext(Dispatchers.Main) {
                     pararAnimacaoPontinhos()
                     decidirProximaTela()
@@ -261,46 +275,27 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    private fun testarConexaoIndividual(baseUrl: String, user: String, pass: String): String? {
-        val urlLimpa = normalizarBaseUrl(baseUrl).removeSuffix("/")
+    // ✅ FIX: método único para testar servidor — recebe o client como parâmetro
+    // Elimina duplicação entre testarConexaoIndividual e testarConexaoIndividualLento
+    private fun testarServidor(baseUrl: String, user: String, pass: String, httpClient: OkHttpClient): String? {
+        // ✅ FIX: retorna URL COM barra — consistente com o que XtreamApi.setBaseUrl espera
+        val urlBase = normalizarBaseUrl(baseUrl)
+        val urlSemBarra = urlBase.removeSuffix("/")
         return try {
             val request = Request.Builder()
-                .url("$urlLimpa/player_api.php?username=$user&password=$pass")
-                .header("User-Agent", "Mozilla/5.0")
+                .url("$urlSemBarra/player_api.php?username=$user&password=$pass")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                 .build()
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val body = response.body?.string() ?: ""
-                    val valido = body.contains("user_info") &&
-                            body.contains("server_info") &&
-                            !body.contains("\"auth\":0") &&
-                            !body.contains("\"auth\": 0")
-                    if (valido) urlLimpa else null
-                } else null
-            }
-        } catch (e: Exception) { null }
-    }
 
-    private fun testarConexaoIndividualLento(baseUrl: String, user: String, pass: String): String? {
-        val clientLento = OkHttpClient.Builder()
-            .connectTimeout(25, TimeUnit.SECONDS)
-            .readTimeout(25, TimeUnit.SECONDS)
-            .retryOnConnectionFailure(true)
-            .build()
-        val urlLimpa = normalizarBaseUrl(baseUrl).removeSuffix("/")
-        return try {
-            val request = Request.Builder()
-                .url("$urlLimpa/player_api.php?username=$user&password=$pass")
-                .header("User-Agent", "Mozilla/5.0")
-                .build()
-            clientLento.newCall(request).execute().use { response ->
+            httpClient.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     val body = response.body?.string() ?: ""
                     val valido = body.contains("user_info") &&
                             body.contains("server_info") &&
                             !body.contains("\"auth\":0") &&
                             !body.contains("\"auth\": 0")
-                    if (valido) urlLimpa else null
+                    // ✅ Retorna COM barra para ser consistente com normalizarBaseUrl
+                    if (valido) urlBase else null
                 } else null
             }
         } catch (e: Exception) { null }
@@ -318,7 +313,11 @@ class LoginActivity : AppCompatActivity() {
                         val batch = mutableListOf<VodEntity>()
                         for (i in 0 until minOf(10, arr.length())) {
                             val o = arr.getJSONObject(i)
-                            batch.add(VodEntity(o.optInt("stream_id"), o.optString("name"), o.optString("name"), o.optString("stream_icon"), o.optString("container_extension"), o.optString("rating"), o.optString("category_id"), o.optLong("added")))
+                            batch.add(VodEntity(
+                                o.optInt("stream_id"), o.optString("name"), o.optString("name"),
+                                o.optString("stream_icon"), o.optString("container_extension"),
+                                o.optString("rating"), o.optString("category_id"), o.optLong("added")
+                            ))
                         }
                         if (batch.isNotEmpty()) db.streamDao().insertVodStreams(batch)
                     } catch (e: Exception) { e.printStackTrace() }
@@ -330,7 +329,10 @@ class LoginActivity : AppCompatActivity() {
                         val batch = mutableListOf<SeriesEntity>()
                         for (i in 0 until minOf(10, arr.length())) {
                             val o = arr.getJSONObject(i)
-                            batch.add(SeriesEntity(o.optInt("series_id"), o.optString("name"), o.optString("cover"), o.optString("rating"), o.optString("category_id"), o.optLong("last_modified")))
+                            batch.add(SeriesEntity(
+                                o.optInt("series_id"), o.optString("name"), o.optString("cover"),
+                                o.optString("rating"), o.optString("category_id"), o.optLong("last_modified")
+                            ))
                         }
                         if (batch.isNotEmpty()) db.streamDao().insertSeriesStreams(batch)
                     } catch (e: Exception) { e.printStackTrace() }
@@ -352,6 +354,7 @@ class LoginActivity : AppCompatActivity() {
         } catch (e: Exception) { e.printStackTrace() }
     }
 
+    // ✅ Sempre retorna URL com barra no final
     private fun normalizarBaseUrl(dns: String): String {
         var url = dns.trim()
         if (url.contains("player_api.php")) url = url.substringBefore("player_api.php")
@@ -362,14 +365,19 @@ class LoginActivity : AppCompatActivity() {
 
     private fun salvarCredenciais(dns: String, user: String, pass: String) {
         getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE).edit().apply {
-            putString("dns", dns); putString("username", user); putString("password", pass); apply()
+            putString("dns", dns)
+            putString("username", user)
+            putString("password", pass)
+            apply()
         }
         XtreamApi.salvarDns(this, dns)
     }
 
     private fun decidirProximaTela() {
-        val intent = if (isTv()) Intent(this, HomeActivity::class.java).apply { putExtra("PROFILE_NAME", "TV_Box") }
-                     else Intent(this, ProfilesActivity::class.java)
+        val intent = if (isTv())
+            Intent(this, HomeActivity::class.java).apply { putExtra("PROFILE_NAME", "TV_Box") }
+        else
+            Intent(this, ProfilesActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         finish()
