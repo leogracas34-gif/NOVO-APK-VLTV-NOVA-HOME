@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true"
     android:background="#0A0A0A">
 
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
+        <!-- AppBarLayout SEM TabLayout — só hero + botões -->
         <com.google.android.material.appbar.AppBarLayout
             android:id="@+id/appBar"
             android:layout_width="match_parent"
@@ -18,7 +19,7 @@
 
             <com.google.android.material.appbar.CollapsingToolbarLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" 
+                android:layout_height="wrap_content"
                 app:layout_scrollFlags="scroll|exitUntilCollapsed">
 
                 <ImageView
@@ -26,13 +27,13 @@
                     android:layout_width="match_parent"
                     android:layout_height="500dp"
                     android:scaleType="centerCrop"
-                    app:layout_collapseMode="parallax" />
+                    app:layout_collapseMode="parallax"/>
 
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="500dp"
                     android:background="@drawable/bg_gradient_details"
-                    app:layout_collapseMode="parallax" />
+                    app:layout_collapseMode="parallax"/>
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -40,11 +41,9 @@
                     android:layout_gravity="bottom"
                     android:orientation="vertical"
                     android:paddingHorizontal="24dp"
-                    android:paddingBottom="24dp">
+                    android:paddingBottom="16dp">
 
-                    <Space
-                        android:layout_width="match_parent"
-                        android:layout_height="100dp" />
+                    <Space android:layout_width="match_parent" android:layout_height="100dp"/>
 
                     <ImageView
                         android:id="@+id/imgTitleLogo"
@@ -52,7 +51,7 @@
                         android:layout_height="120dp"
                         android:layout_gravity="center"
                         android:visibility="gone"
-                        android:scaleType="fitCenter" />
+                        android:scaleType="fitCenter"/>
 
                     <TextView
                         android:id="@+id/tvTitle"
@@ -60,22 +59,23 @@
                         android:layout_height="wrap_content"
                         android:gravity="center"
                         android:textColor="#FFFFFF"
-                        android:textSize="32sp"
-                        android:textStyle="bold" />
+                        android:textSize="28sp"
+                        android:textStyle="bold"
+                        android:fontFamily="sans-serif-condensed"/>
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
                         android:gravity="center"
-                        android:layout_marginTop="8dp">
+                        android:layout_marginTop="6dp">
 
                         <LinearLayout
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
                             android:gravity="center">
-                            
+
                             <TextView
                                 android:id="@+id/tvRating"
                                 android:layout_width="wrap_content"
@@ -91,13 +91,14 @@
                                 android:textColor="#CCCCCC"
                                 android:textSize="12sp"
                                 android:layout_marginEnd="8dp"/>
-                            
+
                             <TextView
                                 android:id="@+id/tvGenre"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:textColor="#CCCCCC"
                                 android:textSize="12sp"/>
+
                         </LinearLayout>
 
                         <LinearLayout
@@ -105,20 +106,21 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
-                            android:layout_marginTop="6dp"
+                            android:layout_marginTop="5dp"
                             android:visibility="gone">
                             <TextView android:id="@+id/tvBadge4k" android:text="4K" android:background="#33FFFFFF" android:paddingHorizontal="4dp" android:layout_marginEnd="4dp" android:textColor="#FFF" android:textSize="10sp" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:visibility="gone"/>
                             <TextView android:id="@+id/tvBadgeHdr" android:text="HDR" android:background="#33FFFFFF" android:paddingHorizontal="4dp" android:layout_marginEnd="4dp" android:textColor="#FFF" android:textSize="10sp" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:visibility="gone"/>
                             <TextView android:id="@+id/tvBadgeDolby" android:text="ATMOS" android:background="#33FFFFFF" android:paddingHorizontal="4dp" android:layout_marginEnd="4dp" android:textColor="#FFF" android:textSize="10sp" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:visibility="gone"/>
                             <TextView android:id="@+id/tvBadge51" android:text="5.1" android:background="#33FFFFFF" android:paddingHorizontal="4dp" android:layout_marginEnd="4dp" android:textColor="#FFF" android:textSize="10sp" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:visibility="gone"/>
                         </LinearLayout>
+
                     </LinearLayout>
 
                     <FrameLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="24dp">
-                        
+                        android:layout_marginTop="20dp">
+
                         <Button
                             android:id="@+id/btnPlay"
                             android:layout_width="match_parent"
@@ -127,7 +129,7 @@
                             android:text="▶ ASSISTIR"
                             android:textColor="#000000"
                             android:textStyle="bold"
-                            android:textSize="16sp"/>
+                            android:textSize="15sp"/>
 
                         <Button
                             android:id="@+id/btnResume"
@@ -137,8 +139,9 @@
                             android:text="▶ CONTINUAR"
                             android:textColor="#000000"
                             android:textStyle="bold"
-                            android:textSize="16sp"
-                            android:visibility="gone" />
+                            android:textSize="15sp"
+                            android:visibility="gone"/>
+
                     </FrameLayout>
 
                     <LinearLayout
@@ -147,7 +150,7 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
                         android:visibility="gone"
-                        android:layout_marginTop="12dp">
+                        android:layout_marginTop="10dp">
 
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -159,10 +162,10 @@
                                 android:id="@+id/progressBarMovie"
                                 style="?android:attr/progressBarStyleHorizontal"
                                 android:layout_width="0dp"
-                                android:layout_height="4dp"
+                                android:layout_height="3dp"
                                 android:layout_weight="1"
                                 android:progressBackgroundTint="#333333"
-                                android:progress="0" />
+                                android:progress="0"/>
 
                             <TextView
                                 android:id="@+id/tvTimeRemaining"
@@ -172,6 +175,7 @@
                                 android:textColor="#CCCCCC"
                                 android:textSize="10sp"
                                 android:layout_marginStart="8dp"/>
+
                         </LinearLayout>
 
                         <LinearLayout
@@ -180,7 +184,7 @@
                             android:layout_height="wrap_content"
                             android:orientation="horizontal"
                             android:gravity="center"
-                            android:layout_marginTop="8dp"
+                            android:layout_marginTop="6dp"
                             android:layout_gravity="center_horizontal"
                             android:padding="8dp"
                             android:clickable="true"
@@ -188,8 +192,8 @@
                             android:background="?attr/selectableItemBackground">
 
                             <ImageView
-                                android:layout_width="16dp"
-                                android:layout_height="16dp"
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
                                 android:src="@android:drawable/ic_menu_rotate"
                                 app:tint="#CCCCCC"/>
 
@@ -198,15 +202,18 @@
                                 android:layout_height="wrap_content"
                                 android:text="Assistir do Início"
                                 android:textColor="#CCCCCC"
-                                android:textSize="12sp"
-                                android:layout_marginStart="6dp"/>
+                                android:textSize="11sp"
+                                android:layout_marginStart="5dp"/>
+
                         </LinearLayout>
+
                     </LinearLayout>
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="horizontal"
-                        android:layout_marginTop="16dp"
+                        android:layout_marginTop="14dp"
                         android:gravity="center">
 
                         <LinearLayout
@@ -217,22 +224,23 @@
                             android:layout_weight="1"
                             android:clickable="true"
                             android:focusable="true">
-                            
+
                             <ImageButton
                                 android:id="@+id/btnFavorite"
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="28dp"
+                                android:layout_height="28dp"
                                 android:background="@android:color/transparent"
                                 android:src="@android:drawable/btn_star_big_off"
                                 android:scaleType="fitCenter"/>
-                            
+
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Minha Lista"
                                 android:textColor="#FFFFFF"
-                                android:textSize="10sp"
+                                android:textSize="9sp"
                                 android:layout_marginTop="4dp"/>
+
                         </LinearLayout>
 
                         <LinearLayout
@@ -244,65 +252,66 @@
                             android:layout_weight="1"
                             android:clickable="true"
                             android:focusable="true"
-                            android:visibility="visible">
+                            android:visibility="gone">
 
                             <ImageView
                                 android:id="@+id/imgDownloadState"
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
                                 android:src="@android:drawable/stat_sys_download"
-                                app:tint="#FFFFFF" />
-                            
+                                app:tint="#FFFFFF"/>
+
                             <TextView
                                 android:id="@+id/tvDownloadState"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:text="Baixar"
                                 android:textColor="#FFFFFF"
-                                android:textSize="10sp"
-                                android:layout_marginTop="8dp"/>
+                                android:textSize="9sp"
+                                android:layout_marginTop="4dp"/>
+
                         </LinearLayout>
+
                     </LinearLayout>
 
-                    <TextView 
-                        android:id="@+id/tvPlot" 
-                        android:layout_width="match_parent" 
-                        android:layout_height="wrap_content" 
-                        android:layout_marginTop="16dp"
-                        android:maxLines="3"
-                        android:ellipsize="end"
-                        android:lineSpacingExtra="3dp"
-                        android:textColor="#DDDDDD"
-                        android:textSize="13sp"
-                        android:gravity="center"
-                        android:visibility="gone" />
-
                 </LinearLayout>
-            </com.google.android.material.appbar.CollapsingToolbarLayout>
 
-            <com.google.android.material.tabs.TabLayout
-                android:id="@+id/tabLayout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="#0A0A0A"
-                app:tabIndicatorColor="#FFFFFF"
-                app:tabSelectedTextColor="#FFFFFF"
-                app:tabTextColor="#888888" />
+            </com.google.android.material.appbar.CollapsingToolbarLayout>
 
         </com.google.android.material.appbar.AppBarLayout>
 
+        <!-- NestedScrollView com TabLayout FIXO no topo -->
         <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
+            android:overScrollMode="never"
             app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingBottom="100dp"> 
-                
+                android:paddingBottom="88dp">
+
+                <!-- ✅ TabLayout aqui — sempre visível desde o primeiro frame -->
+                <com.google.android.material.tabs.TabLayout
+                    android:id="@+id/tabLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="#0D0D0D"
+                    app:tabIndicatorColor="#FFFFFF"
+                    app:tabIndicatorHeight="2dp"
+                    app:tabSelectedTextColor="#FFFFFF"
+                    app:tabTextColor="#666666"
+                    app:tabMode="fixed"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#1AFFFFFF"/>
+
+                <!-- Seletor de temporada -->
                 <RelativeLayout
                     android:id="@+id/seasonHeaderContainer"
                     android:layout_width="match_parent"
@@ -317,7 +326,7 @@
                         android:layout_centerVertical="true"
                         app:cardCornerRadius="20dp"
                         app:cardElevation="0dp"
-                        app:cardBackgroundColor="#333333">
+                        app:cardBackgroundColor="#2A2A2A">
 
                         <TextView
                             android:id="@+id/btnSeasonSelector"
@@ -327,74 +336,71 @@
                             android:paddingVertical="8dp"
                             android:text="Temporada 1 ▼"
                             android:textColor="#FFFFFF"
-                            android:textSize="14sp"
+                            android:textSize="13sp"
                             android:textStyle="bold"
-                            android:gravity="center" />
+                            android:gravity="center"/>
+
                     </androidx.cardview.widget.CardView>
 
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentEnd="true"
-                        android:layout_centerVertical="true"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                    <Button
+                        android:id="@+id/btnDownloadSeason"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
+                        android:visibility="gone"/>
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Temporada"
-                            android:textColor="#CCCCCC"
-                            android:textSize="12sp"
-                            android:layout_marginEnd="8dp" />
-
-                        <Button
-                            android:id="@+id/btnDownloadSeason"
-                            android:layout_width="30dp"
-                            android:layout_height="30dp"
-                            android:background="@android:drawable/stat_sys_download"
-                            android:backgroundTint="#FFFFFF"
-                            android:visibility="visible" />
-                    </LinearLayout>
-                        
                 </RelativeLayout>
 
+                <!-- Episódios -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recyclerEpisodes"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:nestedScrollingEnabled="false" />
+                    android:nestedScrollingEnabled="false"/>
 
+                <!-- Sugestões -->
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/recyclerSuggestions"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:visibility="gone"
-                    android:nestedScrollingEnabled="false" />
+                    android:nestedScrollingEnabled="false"/>
 
-                <TextView 
-                    android:id="@+id/tvCast" 
-                    android:layout_width="match_parent" 
-                    android:layout_height="wrap_content" 
-                    android:visibility="gone" />
+                <!-- Detalhes -->
+                <TextView
+                    android:id="@+id/tvPlot"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="12dp"
+                    android:textColor="#DDDDDD"
+                    android:textSize="13sp"
+                    android:lineSpacingExtra="3dp"
+                    android:visibility="gone"/>
 
-                <androidx.recyclerview.widget.RecyclerView 
-                    android:id="@+id/recyclerCast" 
-                    android:layout_width="match_parent" 
-                    android:layout_height="wrap_content" 
+                <TextView
+                    android:id="@+id/tvCast"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="8dp"
+                    android:textColor="#AAAAAA"
+                    android:textSize="12sp"
+                    android:visibility="gone"/>
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerCast"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     android:visibility="gone"
-                    android:nestedScrollingEnabled="false" />
+                    android:nestedScrollingEnabled="false"/>
 
-                <ImageView
-                    android:id="@+id/imgPoster"
-                    android:layout_width="0dp"
-                    android:layout_height="0dp"
-                    android:visibility="gone" />
-
+                <!-- Views ocultas para compatibilidade -->
+                <ImageView android:id="@+id/imgPoster" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
                 <TextView android:id="@+id/tvCreatedBy" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
                 <TextView android:id="@+id/btnCloseSeasonSelectorText" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
 
             </LinearLayout>
+
         </androidx.core.widget.NestedScrollView>
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
@@ -408,6 +414,6 @@
         app:itemIconTint="@color/white"
         app:itemTextColor="@color/white"
         app:labelVisibilityMode="labeled"
-        app:menu="@menu/bottom_nav_menu" />
+        app:menu="@menu/bottom_nav_menu"/>
 
 </FrameLayout>
