@@ -24,7 +24,9 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DecodeFormat                                      // ✅ HD
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions        // ✅ HD
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -48,18 +50,17 @@ class KidsActivity : AppCompatActivity() {
     private var pass = ""
 
     private val termosProibidos = listOf(
-        "adulto", "xxx", "sexo", "sexy", "porn", "18+", "erótico", "violência", 
+        "adulto", "xxx", "sexo", "sexy", "porn", "18+", "erótico", "violência",
         "007", "terror", "horror", "assassinato", "guerra", "pânico", "morte"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // --- ALTERAÇÃO: GARANTE QUE OS BOTÕES DO APARELHO FIQUEM FIXOS ---
+
+        // --- GARANTE QUE OS BOTÕES DO APARELHO FIQUEM FIXOS ---
         WindowCompat.setDecorFitsSystemWindows(window, true)
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
-        windowInsetsController.isAppearanceLightStatusBars = false 
-        // Removidas as linhas que ocultavam as systemBars (navigationBars)
+        windowInsetsController.isAppearanceLightStatusBars = false
 
         setContentView(R.layout.activity_kids)
 
@@ -80,7 +81,7 @@ class KidsActivity : AppCompatActivity() {
         }
 
         configurarFoco(etSearchKids)
-        etSearchKids.isFocusableInTouchMode = true 
+        etSearchKids.isFocusableInTouchMode = true
         etSearchKids.setOnClickListener {
             etSearchKids.requestFocus()
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
@@ -91,7 +92,7 @@ class KidsActivity : AppCompatActivity() {
             if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_GO) {
                 val query = v.text.toString().trim()
                 val contemProibido = termosProibidos.any { query.contains(it, ignoreCase = true) }
-                
+
                 if (query.isNotEmpty() && !contemProibido) {
                     val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                     imm.hideSoftInputFromWindow(v.windowToken, 0)
@@ -114,10 +115,10 @@ class KidsActivity : AppCompatActivity() {
         setupLayouts()
         setupHubChannels()
         carregarConteudoKids()
-        setupBottomNavigation() // Chamada para configurar o rodapé
+        setupBottomNavigation()
     }
 
-    // --- NOVA FUNÇÃO: CONFIGURAÇÃO DO RODAPÉ ---
+    // --- CONFIGURAÇÃO DO RODAPÉ ---
     private fun setupBottomNavigation() {
         val nav = findViewById<BottomNavigationView>(R.id.bottomNavigation)
         nav?.setOnItemSelectedListener { item ->
@@ -129,7 +130,7 @@ class KidsActivity : AppCompatActivity() {
                 R.id.nav_search -> {
                     val intent = Intent(this, SearchActivity::class.java)
                     startActivity(intent)
-                    false 
+                    false
                 }
                 R.id.nav_novidades -> {
                     val intent = Intent(this, NovidadesActivity::class.java)
@@ -148,7 +149,6 @@ class KidsActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Mantendo os botões fixos também no onResume
         WindowCompat.setDecorFitsSystemWindows(window, true)
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
         windowInsetsController.isAppearanceLightStatusBars = false
@@ -390,13 +390,16 @@ class KidsActivity : AppCompatActivity() {
 
     data class KidsRecentItem(val id: String, val nome: String, val capa: String, val tipo: String, val filmeObj: VodStream?, val serieObj: SeriesStream?)
 
+    // =========================================================
+    // ADAPTER: HubAdapter (canais ao vivo — logos dos canais)
+    // =========================================================
     inner class HubAdapter(val list: List<LiveStream>, val onClick: (LiveStream) -> Unit) : RecyclerView.Adapter<HubAdapter.VH>() {
         inner class VH(v: View) : RecyclerView.ViewHolder(v) {
             val img: ImageView = v.findViewById(R.id.imgLogoHub)
             val txt: TextView = v.findViewById(R.id.tvNameHub)
             val container: LinearLayout = v.findViewById(R.id.containerHub)
         }
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = 
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
             VH(LayoutInflater.from(parent.context).inflate(R.layout.item_hub_kids, parent, false))
 
         override fun onBindViewHolder(holder: VH, position: Int) {
@@ -404,10 +407,14 @@ class KidsActivity : AppCompatActivity() {
             val nomeUpper = item.name.uppercase()
             holder.txt.text = nomeUpper
 
+            // ✅ HD: format ARGB_8888 + DiskCache + CrossFade
             Glide.with(holder.itemView.context)
                 .load(item.icon)
+                .format(DecodeFormat.PREFER_ARGB_8888)
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .fitCenter() 
+                .placeholder(R.drawable.bg_logo_placeholder)
+                .transition(DrawableTransitionOptions.withCrossFade(200))
+                .fitCenter()
                 .into(holder.img)
 
             val corFundo = when {
@@ -426,48 +433,99 @@ class KidsActivity : AppCompatActivity() {
         override fun getItemCount() = list.size
     }
 
+    // =========================================================
+    // ADAPTER: KidsUnifiedAdapter (recentes — filmes + séries)
+    // =========================================================
     inner class KidsUnifiedAdapter(val list: List<KidsRecentItem>, val onClick: (KidsRecentItem) -> Unit) : RecyclerView.Adapter<KidsUnifiedAdapter.VH>() {
         inner class VH(v: View) : RecyclerView.ViewHolder(v) {
             val img: ImageView = v.findViewById(R.id.imgPoster)
             val txt: TextView = v.findViewById(R.id.tvName)
         }
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = VH(LayoutInflater.from(parent.context).inflate(R.layout.item_vod, parent, false))
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
+            VH(LayoutInflater.from(parent.context).inflate(R.layout.item_vod, parent, false))
+
         override fun onBindViewHolder(holder: VH, position: Int) {
             val item = list[position]
             holder.txt.text = item.nome
-            Glide.with(holder.itemView.context).load(item.capa).diskCacheStrategy(DiskCacheStrategy.ALL).override(200, 300).centerCrop().into(holder.img)
+
+            // ✅ HD: format ARGB_8888 + override 240x360 + thumbnail + CrossFade
+            Glide.with(holder.itemView.context)
+                .load(item.capa)
+                .format(DecodeFormat.PREFER_ARGB_8888)
+                .override(240, 360)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .placeholder(R.drawable.bg_logo_placeholder)
+                .thumbnail(0.15f)
+                .transition(DrawableTransitionOptions.withCrossFade(200))
+                .centerCrop()
+                .into(holder.img)
+
             configurarFoco(holder.itemView)
             holder.itemView.setOnClickListener { onClick(item) }
         }
         override fun getItemCount() = list.size
     }
 
+    // =========================================================
+    // ADAPTER: KidsVodAdapter (filmes kids)
+    // =========================================================
     inner class KidsVodAdapter(val list: List<VodStream>, val onClick: (VodStream) -> Unit) : RecyclerView.Adapter<KidsVodAdapter.VH>() {
         inner class VH(v: View) : RecyclerView.ViewHolder(v) {
             val img: ImageView = v.findViewById(R.id.imgPoster)
             val txt: TextView = v.findViewById(R.id.tvName)
         }
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = VH(LayoutInflater.from(parent.context).inflate(R.layout.item_vod, parent, false))
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
+            VH(LayoutInflater.from(parent.context).inflate(R.layout.item_vod, parent, false))
+
         override fun onBindViewHolder(holder: VH, position: Int) {
             val item = list[position]
             holder.txt.text = item.name
-            Glide.with(holder.itemView.context).load(item.icon).diskCacheStrategy(DiskCacheStrategy.ALL).override(200, 300).centerCrop().into(holder.img)
+
+            // ✅ HD: format ARGB_8888 + override 240x360 + thumbnail + CrossFade
+            Glide.with(holder.itemView.context)
+                .load(item.icon)
+                .format(DecodeFormat.PREFER_ARGB_8888)
+                .override(240, 360)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .placeholder(R.drawable.bg_logo_placeholder)
+                .thumbnail(0.15f)
+                .transition(DrawableTransitionOptions.withCrossFade(200))
+                .centerCrop()
+                .into(holder.img)
+
             configurarFoco(holder.itemView)
             holder.itemView.setOnClickListener { onClick(item) }
         }
         override fun getItemCount() = list.size
     }
 
+    // =========================================================
+    // ADAPTER: KidsSeriesAdapter (séries kids)
+    // =========================================================
     inner class KidsSeriesAdapter(val list: List<SeriesStream>, val onClick: (SeriesStream) -> Unit) : RecyclerView.Adapter<KidsSeriesAdapter.VH>() {
         inner class VH(v: View) : RecyclerView.ViewHolder(v) {
             val img: ImageView = v.findViewById(R.id.imgPoster)
             val txt: TextView = v.findViewById(R.id.tvName)
         }
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = VH(LayoutInflater.from(parent.context).inflate(R.layout.item_vod, parent, false))
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
+            VH(LayoutInflater.from(parent.context).inflate(R.layout.item_vod, parent, false))
+
         override fun onBindViewHolder(holder: VH, position: Int) {
             val item = list[position]
             holder.txt.text = item.name
-            Glide.with(holder.itemView.context).load(item.icon).diskCacheStrategy(DiskCacheStrategy.ALL).override(200, 300).centerCrop().into(holder.img)
+
+            // ✅ HD: format ARGB_8888 + override 240x360 + thumbnail + CrossFade
+            Glide.with(holder.itemView.context)
+                .load(item.icon)
+                .format(DecodeFormat.PREFER_ARGB_8888)
+                .override(240, 360)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .placeholder(R.drawable.bg_logo_placeholder)
+                .thumbnail(0.15f)
+                .transition(DrawableTransitionOptions.withCrossFade(200))
+                .centerCrop()
+                .into(holder.img)
+
             configurarFoco(holder.itemView)
             holder.itemView.setOnClickListener { onClick(item) }
         }
