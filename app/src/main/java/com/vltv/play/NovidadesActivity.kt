@@ -4,7 +4,6 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -29,17 +28,16 @@ class NovidadesActivity : AppCompatActivity() {
     private lateinit var tabTopFilmes: TextView
     private lateinit var recyclerNovidades: RecyclerView
     private lateinit var bottomNavigation: BottomNavigationView
-
     private lateinit var adapter: NovidadesAdapter
 
-    private var listaEmBreve = mutableListOf<NovidadeItem>()
-    private var listaTodoMundo = mutableListOf<NovidadeItem>()
-    private var listaTopSeries = mutableListOf<NovidadeItem>()
-    private var listaTopFilmes = mutableListOf<NovidadeItem>()
+    private val listaEmBreve    = mutableListOf<NovidadeItem>()
+    private val listaTodoMundo  = mutableListOf<NovidadeItem>()
+    private val listaTopSeries  = mutableListOf<NovidadeItem>()
+    private val listaTopFilmes  = mutableListOf<NovidadeItem>()
 
-    private val apiKey = "9b73f5dd15b8165b1b57419be2f29128"
-    private val client = OkHttpClient()
-    private var currentProfile: String = "Padrao"
+    private val apiKey   = "9b73f5dd15b8165b1b57419be2f29128"
+    private val client   = OkHttpClient()
+    private var currentProfile = "Padrao"
     private val database by lazy { AppDatabase.getDatabase(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,21 +46,20 @@ class NovidadesActivity : AppCompatActivity() {
 
         currentProfile = intent.getStringExtra("PROFILE_NAME") ?: "Padrao"
 
-        inicializarViews()
-        configurarRecyclerView()
-        configurarCliquesDasAbas()
-        configurarRodape()
-
-        carregarTodasAsListasTMDb()
-    }
-
-    private fun inicializarViews() {
-        tabEmBreve = findViewById(R.id.tabEmBreve)
-        tabTodoMundo = findViewById(R.id.tabBombando)
-        tabTopSeries = findViewById(R.id.tabTopSeries)
-        tabTopFilmes = findViewById(R.id.tabTopFilmes)
+        tabEmBreve       = findViewById(R.id.tabEmBreve)
+        tabTodoMundo     = findViewById(R.id.tabBombando)
+        tabTopSeries     = findViewById(R.id.tabTopSeries)
+        tabTopFilmes     = findViewById(R.id.tabTopFilmes)
         recyclerNovidades = findViewById(R.id.recyclerNovidades)
-        bottomNavigation = findViewById(R.id.bottomNavigation)
+        bottomNavigation  = findViewById(R.id.bottomNavigation)
+
+        adapter = NovidadesAdapter(emptyList(), currentProfile, database)
+        recyclerNovidades.layoutManager = LinearLayoutManager(this)
+        recyclerNovidades.adapter = adapter
+
+        configurarAbas()
+        configurarRodape()
+        carregarTudo()
     }
 
     private fun configurarRodape() {
@@ -71,152 +68,202 @@ class NovidadesActivity : AppCompatActivity() {
             when (item.itemId) {
                 R.id.nav_home -> { finish(); true }
                 R.id.nav_search -> {
-                    startActivity(Intent(this, SearchActivity::class.java).apply { putExtra("PROFILE_NAME", currentProfile) })
-                    finish()
-                    true
+                    startActivity(Intent(this, SearchActivity::class.java).apply {
+                        putExtra("PROFILE_NAME", currentProfile)
+                    })
+                    finish(); true
                 }
                 R.id.nav_novidades -> true
                 R.id.nav_profile -> {
-                    startActivity(Intent(this, SettingsActivity::class.java).apply { putExtra("PROFILE_NAME", currentProfile) })
-                    finish()
-                    true
+                    startActivity(Intent(this, SettingsActivity::class.java).apply {
+                        putExtra("PROFILE_NAME", currentProfile)
+                    })
+                    finish(); true
                 }
                 else -> false
             }
         }
     }
 
-    private fun configurarRecyclerView() {
-        adapter = NovidadesAdapter(emptyList(), currentProfile)
-        recyclerNovidades.layoutManager = LinearLayoutManager(this)
-        recyclerNovidades.adapter = adapter
+    private fun configurarAbas() {
+        // Ativa "Em Breve" por padrão
+        ativarAba(tabEmBreve)
+
+        tabEmBreve.setOnClickListener {
+            ativarAba(tabEmBreve)
+            adapter.atualizarLista(listaEmBreve)
+            recyclerNovidades.scrollToPosition(0)
+        }
+        tabTodoMundo.setOnClickListener {
+            ativarAba(tabTodoMundo)
+            adapter.atualizarLista(listaTodoMundo)
+            recyclerNovidades.scrollToPosition(0)
+        }
+        tabTopSeries.setOnClickListener {
+            ativarAba(tabTopSeries)
+            adapter.atualizarLista(listaTopSeries)
+            recyclerNovidades.scrollToPosition(0)
+        }
+        tabTopFilmes.setOnClickListener {
+            ativarAba(tabTopFilmes)
+            adapter.atualizarLista(listaTopFilmes)
+            recyclerNovidades.scrollToPosition(0)
+        }
     }
 
-    private fun configurarCliquesDasAbas() {
-        tabEmBreve.setOnClickListener { ativarAba(tabEmBreve); adapter.atualizarLista(listaEmBreve); recyclerNovidades.scrollToPosition(0) }
-        tabTodoMundo.setOnClickListener { ativarAba(tabTodoMundo); adapter.atualizarLista(listaTodoMundo); recyclerNovidades.scrollToPosition(0) }
-        tabTopSeries.setOnClickListener { ativarAba(tabTopSeries); adapter.atualizarLista(listaTopSeries); recyclerNovidades.scrollToPosition(0) }
-        tabTopFilmes.setOnClickListener { ativarAba(tabTopFilmes); adapter.atualizarLista(listaTopFilmes); recyclerNovidades.scrollToPosition(0) }
-    }
-
-    private fun ativarAba(abaAtiva: TextView) {
-        val todasAsAbas = listOf(tabEmBreve, tabTodoMundo, tabTopSeries, tabTopFilmes)
-        for (aba in todasAsAbas) {
-            if (aba == abaAtiva) {
-                aba.setBackgroundResource(R.drawable.bg_aba_selecionada)
-                aba.setTextColor(Color.BLACK)
+    private fun ativarAba(aba: TextView) {
+        listOf(tabEmBreve, tabTodoMundo, tabTopSeries, tabTopFilmes).forEach {
+            if (it == aba) {
+                it.setBackgroundResource(R.drawable.bg_aba_selecionada)
+                it.setTextColor(Color.BLACK)
             } else {
-                aba.setBackgroundResource(R.drawable.bg_aba_inativa)
-                aba.setTextColor(Color.WHITE)
+                it.setBackgroundResource(R.drawable.bg_aba_inativa)
+                it.setTextColor(Color.WHITE)
             }
         }
     }
 
-    private fun carregarTodasAsListasTMDb() {
-        val dataHoje = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()) 
-        
-        // 1. Em Breve
-        val urlEmBreve = "https://api.themoviedb.org/3/discover/movie?api_key=$apiKey&language=pt-BR&region=BR&with_release_type=2|3&primary_release_date.gte=$dataHoje&sort_by=primary_release_date.asc"
-        buscarDadosNaApi(urlEmBreve, listaEmBreve, isTop10 = false, tagFixa = "Estreia em Breve", isEmBreve = true, isSerie = false) {
+    private fun carregarTudo() {
+        val hoje = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val daqui3meses = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            .format(Date(System.currentTimeMillis() + 90L * 24 * 60 * 60 * 1000))
+
+        // 1. Em Breve — filmes que vão estrear (TMDB puro, sem filtro de banco)
+        buscarTMDB(
+            url = "https://api.themoviedb.org/3/discover/movie?api_key=$apiKey&language=pt-BR&region=BR" +
+                  "&with_release_type=2|3&primary_release_date.gte=$hoje" +
+                  "&primary_release_date.lte=$daqui3meses&sort_by=primary_release_date.asc",
+            destino       = listaEmBreve,
+            isTop10       = false,
+            isEmBreve     = true,
+            isSerie       = false,
+            tagFixa       = "Estreia em Breve",
+            usarPoster    = true,
+            limite        = 20
+        ) {
             runOnUiThread { adapter.atualizarLista(listaEmBreve) }
         }
 
-        // 2. Todo Mundo Assistindo (Ajustado para Trending para não repetir o Top 10)
-        val urlTodoMundo = "https://api.themoviedb.org/3/trending/movie/week?api_key=$apiKey&language=pt-BR"
-        buscarDadosNaApi(urlTodoMundo, listaTodoMundo, isTop10 = false, tagFixa = "Bombando no Mundo", isEmBreve = false, isSerie = false) {}
+        // 2. Bombando — trending da semana (filmes + séries)
+        buscarTMDB(
+            url = "https://api.themoviedb.org/3/trending/all/week?api_key=$apiKey&language=pt-BR",
+            destino       = listaTodoMundo,
+            isTop10       = false,
+            isEmBreve     = false,
+            isSerie       = false, // será detectado pelo campo "media_type"
+            tagFixa       = "Bombando no Mundo",
+            usarPoster    = false,
+            limite        = 20,
+            detectarTipo  = true
+        ) {}
 
         // 3. Top 10 Séries
-        val urlTopSeries = "https://api.themoviedb.org/3/tv/popular?api_key=$apiKey&language=pt-BR&page=1"
-        buscarDadosNaApi(urlTopSeries, listaTopSeries, isTop10 = true, tagFixa = "Top 10 Séries", isEmBreve = false, isSerie = true) {}
+        buscarTMDB(
+            url = "https://api.themoviedb.org/3/tv/popular?api_key=$apiKey&language=pt-BR&page=1",
+            destino       = listaTopSeries,
+            isTop10       = true,
+            isEmBreve     = false,
+            isSerie       = true,
+            tagFixa       = "Top 10 Séries",
+            usarPoster    = false,
+            limite        = 10
+        ) {}
 
         // 4. Top 10 Filmes
-        val urlTopFilmes = "https://api.themoviedb.org/3/movie/popular?api_key=$apiKey&language=pt-BR&page=1"
-        buscarDadosNaApi(urlTopFilmes, listaTopFilmes, isTop10 = true, tagFixa = "Top 10 Filmes", isEmBreve = false, isSerie = false) {}
+        buscarTMDB(
+            url = "https://api.themoviedb.org/3/movie/popular?api_key=$apiKey&language=pt-BR&page=1",
+            destino       = listaTopFilmes,
+            isTop10       = true,
+            isEmBreve     = false,
+            isSerie       = false,
+            tagFixa       = "Top 10 Filmes",
+            usarPoster    = false,
+            limite        = 10
+        ) {}
     }
 
-    private fun buscarDadosNaApi(
-        url: String, 
-        listaDestino: MutableList<NovidadeItem>, 
-        isTop10: Boolean, 
-        tagFixa: String, 
+    private fun buscarTMDB(
+        url: String,
+        destino: MutableList<NovidadeItem>,
+        isTop10: Boolean,
         isEmBreve: Boolean,
         isSerie: Boolean,
-        onSucesso: () -> Unit
+        tagFixa: String,
+        usarPoster: Boolean,
+        limite: Int,
+        detectarTipo: Boolean = false,
+        onSucesso: () -> Unit = {}
     ) {
-        val request = Request.Builder().url(url).build()
-        client.newCall(request).enqueue(object : Callback {
+        client.newCall(Request.Builder().url(url).build()).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {}
             override fun onResponse(call: Call, response: Response) {
                 val body = response.body?.string() ?: return
                 try {
                     val results = JSONObject(body).optJSONArray("results") ?: return
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val tempLista = mutableListOf<NovidadeItem>()
-                        var posicaoCount = 1
-                        
-                        // Busca o catálogo completo uma vez por aba para comparar
-                        val catalogoSeries = if (isSerie && !isEmBreve) database.streamDao().getAllSeries() else emptyList()
-                        val catalogoVods = if (!isSerie && !isEmBreve) database.streamDao().getAllVods() else emptyList()
+                    val temp = mutableListOf<NovidadeItem>()
+                    var posicao = 1
 
-                        for (i in 0 until results.length()) {
-                            if (tempLista.size >= (if (isTop10) 10 else 20)) break
+                    for (i in 0 until results.length()) {
+                        if (temp.size >= limite) break
+                        val obj = results.getJSONObject(i)
 
-                            val itemJson = results.getJSONObject(i)
-                            val tituloOrig = itemJson.optString("title", itemJson.optString("name", "Sem Título"))
-                            
-                            var idServidorValido = 0
-                            
-                            if (!isEmBreve) {
-                                val nomeParaBusca = tituloOrig.lowercase().trim()
-                                
-                                if (isSerie) {
-                                    val serieLocal = catalogoSeries.find { it.name.lowercase().contains(nomeParaBusca) }
-                                    if (serieLocal != null) idServidorValido = serieLocal.series_id
-                                } else {
-                                    val filmeLocal = catalogoVods.find { it.name.lowercase().contains(nomeParaBusca) }
-                                    if (filmeLocal != null) idServidorValido = filmeLocal.stream_id
-                                }
-                                
-                                if (idServidorValido == 0) continue
-                            }
+                        // Detecta tipo automaticamente para Trending All
+                        val tipoDetectado = if (detectarTipo)
+                            obj.optString("media_type") == "tv"
+                        else isSerie
 
-                            val pathImagem = if (isEmBreve) itemJson.optString("poster_path", "") 
-                                             else itemJson.optString("backdrop_path", "")
-                            
-                            if (pathImagem.isEmpty()) continue
-                                
-                            val releaseDate = itemJson.optString("release_date", itemJson.optString("first_air_date", ""))
-                            val tagFinal = if (isEmBreve && releaseDate.isNotEmpty()) formatarData(releaseDate) else tagFixa
+                        val titulo = obj.optString("title", obj.optString("name", ""))
+                        if (titulo.isEmpty()) continue
 
-                            tempLista.add(NovidadeItem(
-                                idTMDB = itemJson.optInt("id"),
-                                stream_id = if (!isSerie) idServidorValido else 0,
-                                series_id = if (isSerie) idServidorValido else 0,
-                                titulo = tituloOrig, 
-                                sinopse = itemJson.optString("overview", "Descrição indisponível."), 
-                                imagemFundoUrl = "https://image.tmdb.org/t/p/w780$pathImagem", 
-                                tagline = tagFinal, 
-                                isTop10 = isTop10, 
-                                posicaoTop10 = posicaoCount++, 
-                                isEmBreve = isEmBreve, 
-                                isSerie = isSerie
-                            ))
-                        }
-                        withContext(Dispatchers.Main) {
-                            listaDestino.clear()
-                            listaDestino.addAll(tempLista)
-                            onSucesso()
-                        }
+                        val pathImagem = if (usarPoster)
+                            obj.optString("poster_path", "")
+                        else
+                            obj.optString("backdrop_path", obj.optString("poster_path", ""))
+                        if (pathImagem.isEmpty()) continue
+
+                        val sinopse = obj.optString("overview", "Descrição indisponível.")
+                        val releaseDate = obj.optString("release_date", obj.optString("first_air_date", ""))
+                        val tagFinal = if (isEmBreve && releaseDate.isNotEmpty())
+                            formatarData(releaseDate) else tagFixa
+
+                        // ✅ TMDB puro — disponibilidade verificada no adapter em paralelo
+                        temp.add(NovidadeItem(
+                            idTMDB        = obj.optInt("id"),
+                            stream_id     = 0,
+                            series_id     = 0,
+                            titulo        = titulo,
+                            sinopse       = sinopse,
+                            imagemFundoUrl = "https://image.tmdb.org/t/p/w780$pathImagem",
+                            tagline       = tagFinal,
+                            isSerie       = tipoDetectado,
+                            isEmBreve     = isEmBreve,
+                            isTop10       = isTop10,
+                            posicaoTop10  = posicao++
+                        ))
                     }
-                } catch (e: Exception) {}
+
+                    withContext(Dispatchers.Main) {
+                        destino.clear()
+                        destino.addAll(temp)
+                        onSucesso()
+                    }
+                } catch (e: Exception) { e.printStackTrace() }
             }
         })
     }
 
+    // Precisa ser suspend para usar withContext dentro do enqueue callback
+    private suspend fun <T> withContext(
+        context: kotlin.coroutines.CoroutineContext,
+        block: suspend () -> T
+    ): T = kotlinx.coroutines.withContext(context) { block() }
+
     private fun formatarData(dataIngles: String): String {
         return try {
             val date = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).parse(dataIngles)
-            if (date != null) SimpleDateFormat("'Estreia dia' dd 'de' MMM", Locale("pt", "BR")).format(date) else "Estreia em breve"
+            if (date != null)
+                SimpleDateFormat("'Estreia' dd 'de' MMM", Locale("pt", "BR")).format(date)
+            else "Estreia em breve"
         } catch (e: Exception) { "Estreia em breve" }
     }
 }
