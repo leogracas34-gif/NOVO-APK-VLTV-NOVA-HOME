@@ -112,6 +112,9 @@
         <activity
             android:name=".EditProfileActivity" />
 
+        <activity
+            android:name=".TmdbDetailsActivity"/>
+
     </application>
 
 </manifest>
