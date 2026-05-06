@@ -305,6 +305,9 @@ class ProfilesActivity : AppCompatActivity() {
             .show()
     }
 
+    // ✅ CORREÇÃO CIRÚRGICA 1: usa .copy() em vez de mutar o objeto direto.
+    // O Room identifica o registro pelo ID. Mutando perfil.name diretamente,
+    // o data class pode perder a referência de ID e o UPDATE vira INSERT duplicado.
     private fun editProfileName(perfil: ProfileEntity) {
         val input = EditText(this)
         input.setText(perfil.name)
@@ -312,24 +315,40 @@ class ProfilesActivity : AppCompatActivity() {
             .setTitle("Editar Nome")
             .setView(input)
             .setPositiveButton("Salvar") { _, _ ->
-                perfil.name = input.text.toString()
-                updateProfileInDb(perfil)
+                val perfilAtualizado = perfil.copy(name = input.text.toString())
+                updateProfileInDb(perfilAtualizado)
             }
             .setNegativeButton("Cancelar", null)
             .show()
     }
 
+    // ✅ CORREÇÃO CIRÚRGICA 2: idem — usa .copy() para garantir que o Room
+    // faça UPDATE no ID correto, sem duplicar o perfil no banco.
     private fun openAvatarSelection(perfil: ProfileEntity) {
         val dialog = AvatarSelectionDialog(this, tmdbApiKey) { imageUrl ->
-            perfil.imageUrl = imageUrl
-            updateProfileInDb(perfil)
+            val perfilAtualizado = perfil.copy(imageUrl = imageUrl)
+            updateProfileInDb(perfilAtualizado)
         }
         dialog.show()
     }
 
+    // ✅ CORREÇÃO CIRÚRGICA 3: após salvar no banco, atualiza as SharedPreferences
+    // se o perfil editado for o perfil atualmente ativo.
+    // Sem isso, a Home e as outras telas continuam exibindo nome/avatar antigos.
     private fun updateProfileInDb(perfil: ProfileEntity) {
         lifecycleScope.launch(Dispatchers.IO) {
             db.streamDao().updateProfile(perfil)
+
+            val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+            val nomeAtivo = prefs.getString("last_profile_name", null)
+            if (nomeAtivo == perfil.name) {
+                prefs.edit().apply {
+                    putString("last_profile_name", perfil.name)
+                    putString("last_profile_icon", perfil.imageUrl)
+                    apply()
+                }
+            }
+
             withContext(Dispatchers.Main) {
                 loadProfilesFromDb()
             }
