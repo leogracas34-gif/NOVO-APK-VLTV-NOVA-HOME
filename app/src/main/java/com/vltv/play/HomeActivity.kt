@@ -110,6 +110,15 @@ class HomeActivity : AppCompatActivity() {
             currentProfile = intent.getStringExtra("PROFILE_NAME") ?: savedName ?: "Padrao"
             currentProfileIcon = intent.getStringExtra("PROFILE_ICON") ?: savedIcon
 
+            // ✅ CIRURGIA 1: Sincroniza as prefs com o perfil recebido pelo Intent.
+            // Isso garante que onResume e setupBottomNavigation sempre leiam o perfil correto,
+            // inclusive quando a Home é aberta por SettingsActivity após troca de perfil.
+            prefs.edit().apply {
+                putString("last_profile_name", currentProfile)
+                if (currentProfileIcon != null) putString("last_profile_icon", currentProfileIcon)
+                apply()
+            }
+
             val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
             windowInsetsController.isAppearanceLightStatusBars = false
 
@@ -188,24 +197,26 @@ class HomeActivity : AppCompatActivity() {
         binding.bannerViewPager?.isUserInputEnabled = false
     }
 
+    // ✅ CIRURGIA 2: Substituídas as variáveis locais finalName/finalIcon
+    // (que reliam as prefs e podiam estar desatualizadas) pelas variáveis de
+    // instância currentProfile e currentProfileIcon, que já foram atualizadas
+    // antes desta chamada — tanto no onCreate quanto no onResume.
     private fun setupBottomNavigation() {
         binding.bottomNavigation?.let { nav ->
-            val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-            val finalName = prefs.getString("last_profile_name", currentProfile)
-            val finalIcon = prefs.getString("last_profile_icon", currentProfileIcon)
-
             val profileItem = nav.menu.findItem(R.id.nav_profile)
-            profileItem?.title = finalName
+            profileItem?.title = currentProfile
 
-            if (!finalIcon.isNullOrEmpty()) {
+            if (!currentProfileIcon.isNullOrEmpty()) {
                 Glide.with(this)
                     .asBitmap()
-                    .load(finalIcon)
+                    .load(currentProfileIcon)
                     .circleCrop()
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .into(object : CustomTarget<Bitmap>() {
                         override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                            profileItem?.icon = BitmapDrawable(resources, resource)
+                            if (!isFinishing && !isDestroyed) {
+                                profileItem?.icon = BitmapDrawable(resources, resource)
+                            }
                         }
                         override fun onLoadCleared(placeholder: Drawable?) {}
                     })
@@ -675,6 +686,10 @@ class HomeActivity : AppCompatActivity() {
             currentProfile = prefs.getString("last_profile_name", currentProfile) ?: "Padrao"
             currentProfileIcon = prefs.getString("last_profile_icon", currentProfileIcon)
 
+            // ✅ setupBottomNavigation() chamado APÓS atualizar currentProfile e
+            // currentProfileIcon acima. No original estava na mesma ordem mas
+            // setupBottomNavigation relía as prefs internamente (finalName/finalIcon)
+            // em vez de usar as variáveis já atualizadas — isso foi corrigido na cirurgia 2.
             sortearBannerUnico()
             carregarContinuarAssistindoLocal()
             atualizarNotificacaoDownload()
