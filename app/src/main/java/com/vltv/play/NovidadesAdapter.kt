@@ -23,10 +23,10 @@ import org.json.JSONObject
 import java.net.URL
 import java.net.URLEncoder
 
-class NovidadesAdapter(
+class NovidadesAdapter @JvmOverloads constructor(
     private var lista: List<NovidadeItem>,
     private val currentProfile: String,
-    private val database: AppDatabase
+    private val database: AppDatabase? = null
 ) : RecyclerView.Adapter<NovidadesAdapter.VH>() {
 
     class VH(view: View) : RecyclerView.ViewHolder(view) {
@@ -124,19 +124,20 @@ class NovidadesAdapter(
             }
 
             // Bombando / Top 10 → busca no banco local
-            val nomeParaBusca = item.titulo.lowercase().trim()
+            val nomeParaBusca = limparNome(item.titulo)
+            val dao = database?.streamDao()
 
-            val serieLocal: SeriesEntity? = if (item.isSerie) {
-                database.streamDao().getAllSeries().find { serie ->
+            val serieLocal: SeriesEntity? = if (item.isSerie && dao != null) {
+                dao.getAllSeries().find { serie ->
                     val nomeLocal = limparNome(serie.name)
-                    nomeLocal.contains(nomeParaBusca) || nomeParaBusca.contains(nomeLocal)
+                    matchPreciso(nomeParaBusca, nomeLocal)
                 }
             } else null
 
-            val filmeLocal: VodEntity? = if (!item.isSerie) {
-                database.streamDao().getAllVods().find { vod ->
+            val filmeLocal: VodEntity? = if (!item.isSerie && dao != null) {
+                dao.getAllVods().find { vod ->
                     val nomeLocal = limparNome(vod.name)
-                    nomeLocal.contains(nomeParaBusca) || nomeParaBusca.contains(nomeLocal)
+                    matchPreciso(nomeParaBusca, nomeLocal)
                 }
             } else null
 
@@ -236,9 +237,41 @@ class NovidadesAdapter(
     private fun limparNome(nome: String): String {
         var n = nome.lowercase()
         listOf("fhd", "hd", "sd", "4k", "8k", "h265", "leg", "dublado", "dub",
-               "nacional", "legendado", "|", "-", "_", ".", "(", ")")
+               "nacional", "legendado", "temporada", "season", "s01", "s02", "s03")
             .forEach { n = n.replace(it, " ") }
+        n = n.replace(Regex("[|\\-_.()'"!?:,]"), " ")
         return n.trim().replace(Regex("\\s+"), " ")
+    }
+
+    // ── Match preciso entre título TMDB e nome do banco ──────────────────────
+    // "Origem" NÃO bate com "Pennyworth A Origem do Mordomo"
+    // "Super Mario Galaxy" NÃO bate com "O Galã"
+    private fun matchPreciso(tmdb: String, banco: String): Boolean {
+        if (tmdb == banco) return true
+
+        val stopWords = setOf("o", "a", "os", "as", "um", "uma", "de", "do", "da",
+                              "dos", "das", "e", "em", "the", "an", "of", "in")
+        val ptmdb  = tmdb.split(" ").filter { it.length > 1 && it !in stopWords }
+        val pbanco = banco.split(" ").filter { it.length > 1 && it !in stopWords }
+
+        if (ptmdb.isEmpty() || pbanco.isEmpty()) return false
+
+        // Caso 1: banco é igual ao tmdb (sem stopwords)
+        if (ptmdb == pbanco) return true
+
+        // Caso 2: banco começa com tmdb (ex: "origem" bate "origem dublado")
+        if (pbanco.size >= ptmdb.size && pbanco.take(ptmdb.size) == ptmdb) return true
+
+        // Caso 3: tmdb começa com banco (banco é versão curta do tmdb)
+        if (ptmdb.size > pbanco.size && ptmdb.take(pbanco.size) == pbanco) return true
+
+        // Caso 4: similaridade alta (só para títulos com 4+ palavras)
+        if (ptmdb.size >= 4) {
+            val hits = ptmdb.count { it in pbanco }
+            if (hits.toFloat() / ptmdb.size >= 0.85f) return true
+        }
+
+        return false
     }
 
     // ── Busca logo no TMDB e salva em cache ──────────────────────────────────
