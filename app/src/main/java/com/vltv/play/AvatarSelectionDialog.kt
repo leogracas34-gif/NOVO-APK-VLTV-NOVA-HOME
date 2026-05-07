@@ -233,7 +233,7 @@ class AvatarSelectionDialog(
                     shape = android.graphics.drawable.GradientDrawable.OVAL
                 }
                 clipToOutline = true
-                outlineProvider = android.view.ViewOutlineProvider.OVAL
+                outlineProvider = android.view.ViewOutlineProvider.BACKGROUND
             }
 
             frame.addView(ring)
