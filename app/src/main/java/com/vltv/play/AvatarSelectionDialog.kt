@@ -1,4 +1,3 @@
-android.R.id.background)
 package com.vltv.play.ui
 
 import android.app.Dialog
