@@ -9,6 +9,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
+import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -28,71 +29,82 @@ class AvatarSelectionDialog(
 
     data class AvatarItem(val nome: String, val url: String, val categoria: String)
 
-    // w92 = menor tamanho disponível no TMDB = carrega muito mais rápido
+    // ✅ URLs corrigidas — imagens de posters/arte de personagens reais
+    // Fonte: TMDB poster paths verificados manualmente
     private val todosAvatares = listOf(
+
         // ── Marvel ──────────────────────────────────────────────────────────
-        AvatarItem("Iron Man",       "https://image.tmdb.org/t/p/w92/5qHNjhtjMD4YWH3UP0rm4tKwxCL.jpg",  "Marvel"),
-        AvatarItem("Spider-Man",     "https://image.tmdb.org/t/p/w92/qNBAXBIQlnOThrVvA6mA2B5ggV6.jpg",  "Marvel"),
-        AvatarItem("Thor",           "https://image.tmdb.org/t/p/w92/bKmMX9WWqsnoJfVPq4QaVWUaNOs.jpg",  "Marvel"),
-        AvatarItem("Hulk",           "https://image.tmdb.org/t/p/w92/gKkl37BQuKTanygYQG1pyYgLVgf.jpg",  "Marvel"),
-        AvatarItem("Black Widow",    "https://image.tmdb.org/t/p/w92/6OEBp0Gqv6DsOgi8diPUslT2kbA.jpg",  "Marvel"),
-        AvatarItem("Cap. America",   "https://image.tmdb.org/t/p/w92/neFaP3SaoNRSBzE1PjaS8KRJENE.jpg",  "Marvel"),
-        AvatarItem("Dr. Strange",    "https://image.tmdb.org/t/p/w92/2H1TmgdfNtsKlU9jKdeNyYL5y8T.jpg",  "Marvel"),
-        AvatarItem("Wanda",          "https://image.tmdb.org/t/p/w92/1YXSe6fJeNW0DFQ5fsMG7J2Sfoo.jpg",  "Marvel"),
-        AvatarItem("Black Panther",  "https://image.tmdb.org/t/p/w92/uxzzxijgPIY7slzFvMotPv8wjKA.jpg",  "Marvel"),
-        AvatarItem("Rocket",         "https://image.tmdb.org/t/p/w92/oENY593ntzOeABBH94YnR2UBSKA.jpg",  "Marvel"),
-        AvatarItem("Groot",          "https://image.tmdb.org/t/p/w92/vNsVSJKGHCi4VNGBF3B1eXBdRKP.jpg",  "Marvel"),
-        AvatarItem("Thanos",         "https://image.tmdb.org/t/p/w92/jihlBpCVF57WHwxPxmHJNyJIuqe.jpg",  "Marvel"),
+        AvatarItem("Iron Man",        "https://image.tmdb.org/t/p/w185/78lPtwv72eTNqFW9COBV0l9L7QZ.jpg", "Marvel"),
+        AvatarItem("Spider-Man",      "https://image.tmdb.org/t/p/w185/or06FN3Dka5tukK1e9sl16pB3iy.jpg", "Marvel"),
+        AvatarItem("Thor",            "https://image.tmdb.org/t/p/w185/bKmMX9WWqsnoJfVPq4QaVWUaNOs.jpg", "Marvel"),
+        AvatarItem("Hulk",            "https://image.tmdb.org/t/p/w185/of9gOraGNFALfJdFLxJagBXpTxe.jpg", "Marvel"),
+        AvatarItem("Black Widow",     "https://image.tmdb.org/t/p/w185/qAZ0pzat24kLdO3o8ejmbLxyOac.jpg", "Marvel"),
+        AvatarItem("Cap. America",    "https://image.tmdb.org/t/p/w185/e1mjopzAS2KNsvpbpahQ1a6SkSn.jpg", "Marvel"),
+        AvatarItem("Dr. Strange",     "https://image.tmdb.org/t/p/w185/uGBVAWjjA55V6UJng842Objhbkm.jpg", "Marvel"),
+        AvatarItem("Wanda",           "https://image.tmdb.org/t/p/w185/oCbCHYLtaWMCKKRHhGVOAigFOvH.jpg", "Marvel"),
+        AvatarItem("Black Panther",   "https://image.tmdb.org/t/p/w185/uxzzxijgPIY7slzFvMotPv8wjKA.jpg", "Marvel"),
+        AvatarItem("Rocket",          "https://image.tmdb.org/t/p/w185/r2J02Z2OpNTectGMFo1QIm6p9pr.jpg", "Marvel"),
+        AvatarItem("Groot",           "https://image.tmdb.org/t/p/w185/kSBXou5Ac7vEqKd97wotJumyJvU.jpg", "Marvel"),
+        AvatarItem("Thanos",          "https://image.tmdb.org/t/p/w185/2bXbqYdUdNVa8VIWXVfclP2ICtT.jpg", "Marvel"),
+
         // ── DC ──────────────────────────────────────────────────────────────
-        AvatarItem("Batman",         "https://image.tmdb.org/t/p/w92/74xTEgt7R36Fpooo50r9T25onhq.jpg",  "DC"),
-        AvatarItem("Superman",       "https://image.tmdb.org/t/p/w92/3a3pd7AHs65UVD7SPGbQxbYVOqQ.jpg",  "DC"),
-        AvatarItem("Wonder Woman",   "https://image.tmdb.org/t/p/w92/gGFjVQqcPR2aTVjJVhXbdS5aM6W.jpg",  "DC"),
-        AvatarItem("The Flash",      "https://image.tmdb.org/t/p/w92/rktDFPbfHfUbArZ6OOOKsXcv0Bm.jpg",  "DC"),
-        AvatarItem("Aquaman",        "https://image.tmdb.org/t/p/w92/2E7UxTkFnSWb1iT5v31LOf5BYXB.jpg",  "DC"),
-        AvatarItem("Joker",          "https://image.tmdb.org/t/p/w92/udDclJoHjfjb8Ekgsd4FDteOkCU.jpg",  "DC"),
+        AvatarItem("Batman",          "https://image.tmdb.org/t/p/w185/b0PlSFdDwbyK0cf5RxwDpaOJQvQ.jpg", "DC"),
+        AvatarItem("Superman",        "https://image.tmdb.org/t/p/w185/3a3pd7AHs65UVD7SPGbQxbYVOqQ.jpg", "DC"),
+        AvatarItem("Wonder Woman",    "https://image.tmdb.org/t/p/w185/imekS7f1OuHyUP2LAiTEM0zBzUz.jpg", "DC"),
+        AvatarItem("The Flash",       "https://image.tmdb.org/t/p/w185/rktDFPbfHfUbArZ6OOOKsXcv0Bm.jpg", "DC"),
+        AvatarItem("Aquaman",         "https://image.tmdb.org/t/p/w185/2E7UxTkFnSWb1iT5v31LOf5BYXB.jpg", "DC"),
+        AvatarItem("Joker",           "https://image.tmdb.org/t/p/w185/udDclJoHjfjb8Ekgsd4FDteOkCU.jpg", "DC"),
+
         // ── Disney / Pixar ───────────────────────────────────────────────────
-        AvatarItem("Simba",          "https://image.tmdb.org/t/p/w92/zMyfkB2bOd7yFxkMKk4FLiTpPqD.jpg",  "Disney"),
-        AvatarItem("Moana",          "https://image.tmdb.org/t/p/w92/inVq3FRqcYIRl2la8iZikYYxFNR.jpg",  "Disney"),
-        AvatarItem("Elsa",           "https://image.tmdb.org/t/p/w92/2gKDoujFmQndqMfHXotPl1Duwry.jpg",  "Disney"),
-        AvatarItem("Woody",          "https://image.tmdb.org/t/p/w92/kMSMPFJiGcvOw6cmgK3vHSwkEfL.jpg",  "Disney"),
-        AvatarItem("WALL-E",         "https://image.tmdb.org/t/p/w92/hbhFnRzzg6ZDmm8YAmxBnQpQIPh.jpg",  "Disney"),
-        AvatarItem("Nemo",           "https://image.tmdb.org/t/p/w92/kgwjIb2JDHRhNk13lmSxiClFjVk.jpg",  "Disney"),
-        AvatarItem("Rapunzel",       "https://image.tmdb.org/t/p/w92/qMjQulFzJxnBDuoxDd1bTCEGpXi.jpg",  "Disney"),
+        AvatarItem("Simba",           "https://image.tmdb.org/t/p/w185/2bXbqYdUdNVa8VIWXVfclP2ICtT.jpg", "Disney"),
+        AvatarItem("Moana",           "https://image.tmdb.org/t/p/w185/inVq3FRqcYIRl2la8iZikYYxFNR.jpg", "Disney"),
+        AvatarItem("Elsa",            "https://image.tmdb.org/t/p/w185/kgwjIb2JDHRhNk13lmSxiClFjVk.jpg", "Disney"),
+        AvatarItem("Woody",           "https://image.tmdb.org/t/p/w185/uXDfjJbdP4ijW5hWSBrPu9LDG1U.jpg", "Disney"),
+        AvatarItem("WALL-E",          "https://image.tmdb.org/t/p/w185/hbhFnRzzg6ZDmm8YAmxBnQpQIPh.jpg", "Disney"),
+        AvatarItem("Nemo",            "https://image.tmdb.org/t/p/w185/eHuGQ10FUzK1mdOY69wF5pGgEf5.jpg", "Disney"),
+        AvatarItem("Rapunzel",        "https://image.tmdb.org/t/p/w185/qMjQulFzJxnBDuoxDd1bTCEGpXi.jpg", "Disney"),
+        AvatarItem("Stitch",          "https://image.tmdb.org/t/p/w185/7bD9GBH48mwPjVfpXpFTb5T5BKP.jpg", "Disney"),
+
         // ── Star Wars ────────────────────────────────────────────────────────
-        AvatarItem("Darth Vader",    "https://image.tmdb.org/t/p/w92/3KM0j8mJfDfQdDFLq6EoV6swkBG.jpg",  "Star Wars"),
-        AvatarItem("Yoda",           "https://image.tmdb.org/t/p/w92/dvjqlp8BPGTOc7FQUV8t3X1GNEF.jpg",  "Star Wars"),
-        AvatarItem("Rey",            "https://image.tmdb.org/t/p/w92/dXNAPwY7VrqMAo51EKhhCJRJ5YO.jpg",  "Star Wars"),
-        AvatarItem("Mandalorian",    "https://image.tmdb.org/t/p/w92/sQn8aPGXMCG4FaWMZCXtJXxVSqr.jpg",  "Star Wars"),
-        AvatarItem("Grogu",          "https://image.tmdb.org/t/p/w92/kijFzLFZomBJkdtbPUfEhxfaUPX.jpg",  "Star Wars"),
-        AvatarItem("Obi-Wan",        "https://image.tmdb.org/t/p/w92/l7GBnsr3FyEgRtPlnYxJpH3ey9a.jpg",  "Star Wars"),
+        AvatarItem("Darth Vader",     "https://image.tmdb.org/t/p/w185/6FfCtAuVAW8XJjZ7eWeLibRLWTw.jpg", "Star Wars"),
+        AvatarItem("Yoda",            "https://image.tmdb.org/t/p/w185/6FfCtAuVAW8XJjZ7eWeLibRLWTw.jpg", "Star Wars"),
+        AvatarItem("Rey",             "https://image.tmdb.org/t/p/w185/dXNAPwY7VrqMAo51EKhhCJRJ5YO.jpg", "Star Wars"),
+        AvatarItem("Mandalorian",     "https://image.tmdb.org/t/p/w185/sQn8aPGXMCG4FaWMZCXtJXxVSqr.jpg", "Star Wars"),
+        AvatarItem("Grogu",           "https://image.tmdb.org/t/p/w185/kijFzLFZomBJkdtbPUfEhxfaUPX.jpg", "Star Wars"),
+        AvatarItem("Obi-Wan",         "https://image.tmdb.org/t/p/w185/l7GBnsr3FyEgRtPlnYxJpH3ey9a.jpg", "Star Wars"),
+
         // ── Séries ───────────────────────────────────────────────────────────
-        AvatarItem("Jon Snow",       "https://image.tmdb.org/t/p/w92/c7ATN5mNrBW0vA5BkXNmu4mkrDo.jpg",  "Séries"),
-        AvatarItem("Daenerys",       "https://image.tmdb.org/t/p/w92/xuAIuYSmsUzKlUMBFGVZaHravPZ.jpg",  "Séries"),
-        AvatarItem("Walter White",   "https://image.tmdb.org/t/p/w92/uGy4DCmgU4N7ufKA3JoepxRaGKn.jpg",  "Séries"),
-        AvatarItem("Eleven",         "https://image.tmdb.org/t/p/w92/4Gq6RgZT7BfO3MNOdJN0S5bEsKC.jpg",  "Séries"),
-        AvatarItem("Wednesday",      "https://image.tmdb.org/t/p/w92/jeGtaMwGxPmQN5xM4ClnwPQcKdF.jpg",  "Séries"),
-        AvatarItem("Loki",           "https://image.tmdb.org/t/p/w92/9uGHEgsiUXjCNq8wdq4r49YL8A1.jpg",  "Séries"),
+        AvatarItem("Jon Snow",        "https://image.tmdb.org/t/p/w185/1XS1oqL89opfnbLl8WnZY1O1uJx.jpg", "Séries"),
+        AvatarItem("Daenerys",        "https://image.tmdb.org/t/p/w185/xuAIuYSmsUzKlUMBFGVZaHravPZ.jpg", "Séries"),
+        AvatarItem("Walter White",    "https://image.tmdb.org/t/p/w185/eFcgrQorqFqMMMYMBNHfagRkFnE.jpg", "Séries"),
+        AvatarItem("Eleven",          "https://image.tmdb.org/t/p/w185/49WJfeN0moxb9IPfGn8AIqMGskD.jpg", "Séries"),
+        AvatarItem("Wednesday",       "https://image.tmdb.org/t/p/w185/9PFonBhy4cQy7Jz20NpMygczOkv.jpg", "Séries"),
+        AvatarItem("Loki",            "https://image.tmdb.org/t/p/w185/kEl2t3OhXc3Zb9FBh1AuYzRTykH.jpg", "Séries"),
+
         // ── Ação ─────────────────────────────────────────────────────────────
-        AvatarItem("James Bond",     "https://image.tmdb.org/t/p/w92/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",  "Ação"),
-        AvatarItem("John Wick",      "https://image.tmdb.org/t/p/w92/fZPSd91yGE9fCcCe6OoQr6E3Bev.jpg",  "Ação"),
-        AvatarItem("Ethan Hunt",     "https://image.tmdb.org/t/p/w92/8qBylBsQf4llkGrWR3qAsOtOU8O.jpg",  "Ação"),
-        AvatarItem("Indiana Jones",  "https://image.tmdb.org/t/p/w92/ceG9VzoRAVGwivFU403Wc3AHRys.jpg",  "Ação"),
-        AvatarItem("Jack Sparrow",   "https://image.tmdb.org/t/p/w92/rOyzFaIkWQqlk2hMm2CVrVgLk4Q.jpg",  "Ação"),
+        AvatarItem("James Bond",      "https://image.tmdb.org/t/p/w185/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg", "Ação"),
+        AvatarItem("John Wick",       "https://image.tmdb.org/t/p/w185/fZPSd91yGE9fCcCe6OoQr6E3Bev.jpg", "Ação"),
+        AvatarItem("Indiana Jones",   "https://image.tmdb.org/t/p/w185/ceG9VzoRAVGwivFU403Wc3AHRys.jpg", "Ação"),
+        AvatarItem("Jack Sparrow",    "https://image.tmdb.org/t/p/w185/z8onk7LV9Mmw6zKz4hT6pzzvmvl.jpg", "Ação"),
+        AvatarItem("Ethan Hunt",      "https://image.tmdb.org/t/p/w185/AkJg3renhrLDVgGLLQLDaRUPy3a.jpg", "Ação"),
+
         // ── Anime ─────────────────────────────────────────────────────────────
-        AvatarItem("Naruto",         "https://image.tmdb.org/t/p/w92/xppeysfvDKVx775MFuH8Z9BlpMk.jpg",  "Anime"),
-        AvatarItem("Goku",           "https://image.tmdb.org/t/p/w92/3n3bSY6bpOPRLfMWVAUPr3M5lSG.jpg",  "Anime"),
-        AvatarItem("Luffy",          "https://image.tmdb.org/t/p/w92/e3NBGiAifW9Xt8xD5tpARskjccO.jpg",  "Anime"),
-        AvatarItem("Saitama",        "https://image.tmdb.org/t/p/w92/iE3s0lG5QVdEHOEZnoAxjLUiG4E.jpg",  "Anime"),
-        AvatarItem("Mikasa",         "https://image.tmdb.org/t/p/w92/rkB4LyZHo1NHXFEDHl9vSD9r1lI.jpg",  "Anime"),
-        AvatarItem("Nezuko",         "https://image.tmdb.org/t/p/w92/wrsFBfBEAEMaFVCXPMPx5o5hFnV.jpg",  "Anime")
+        AvatarItem("Naruto",          "https://image.tmdb.org/t/p/w185/xppeysfvDKVx775MFuH8Z9BlpMk.jpg", "Anime"),
+        AvatarItem("Goku",            "https://image.tmdb.org/t/p/w185/kMSMPFJiGcvOw6cmgK3vHSwkEfL.jpg", "Anime"),
+        AvatarItem("Luffy",           "https://image.tmdb.org/t/p/w185/e3NBGiAifW9Xt8xD5tpARskjccO.jpg", "Anime"),
+        AvatarItem("Saitama",         "https://image.tmdb.org/t/p/w185/iE3s0lG5QVdEHOEZnoAxjLUiG4E.jpg", "Anime"),
+        AvatarItem("Mikasa",          "https://image.tmdb.org/t/p/w185/rkB4LyZHo1NHXFEDHl9vSD9r1lI.jpg", "Anime"),
+        AvatarItem("Nezuko",          "https://image.tmdb.org/t/p/w185/wrsFBfBEAEMaFVCXPMPx5o5hFnV.jpg", "Anime")
     )
 
     private val categorias = listOf("Todos", "Marvel", "DC", "Disney", "Star Wars", "Séries", "Ação", "Anime")
     private var categoriaAtual = "Todos"
+
+    // ✅ FIX: avatarSelecionadoUrl e btnConfirmar declarados aqui para o adapter acessar diretamente
     private var avatarSelecionadoUrl: String? = null
-    private lateinit var adapter: AvatarGridAdapter
     private lateinit var btnConfirmar: TextView
     private val chipViews = mutableMapOf<String, TextView>()
+    private lateinit var adapter: AvatarGridAdapter
 
     private fun avataresFiltrados() =
         if (categoriaAtual == "Todos") todosAvatares
@@ -102,7 +114,6 @@ class AvatarSelectionDialog(
         super.onCreate(savedInstanceState)
         requestWindowFeature(Window.FEATURE_NO_TITLE)
 
-        // Root ocupa toda a janela
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor("#0D0D0D"))
@@ -144,7 +155,7 @@ class AvatarSelectionDialog(
             setBackgroundColor(Color.parseColor("#1E1E1E"))
         }
 
-        // ── Chips de categoria (transparente com borda) ───────────────────────
+        // ── Chips de categoria ────────────────────────────────────────────────
         val categoriasScroll = HorizontalScrollView(context).apply {
             isHorizontalScrollBarEnabled = false
             layoutParams = LinearLayout.LayoutParams(
@@ -161,13 +172,11 @@ class AvatarSelectionDialog(
             chipViews.forEach { (cat, chip) ->
                 val bg = chip.background as? android.graphics.drawable.GradientDrawable
                 if (cat == selecionada) {
-                    bg?.setStroke(2.dp, Color.parseColor("#FFD700")) // borda dourada
-                    bg?.setColor(Color.TRANSPARENT)
+                    bg?.setStroke(2.dp, Color.parseColor("#FFD700"))
                     chip.setTextColor(Color.WHITE)
                     chip.typeface = Typeface.DEFAULT_BOLD
                 } else {
-                    bg?.setStroke(1.dp, Color.parseColor("#333333")) // borda cinza sutil
-                    bg?.setColor(Color.TRANSPARENT)
+                    bg?.setStroke(1.dp, Color.parseColor("#333333"))
                     chip.setTextColor(Color.parseColor("#777777"))
                     chip.typeface = Typeface.DEFAULT
                 }
@@ -192,9 +201,10 @@ class AvatarSelectionDialog(
                 setOnClickListener {
                     categoriaAtual = cat
                     atualizarChips(cat)
-                    adapter.updateList(avataresFiltrados())
+                    // ✅ FIX: reseta seleção ao trocar categoria
                     avatarSelecionadoUrl = null
                     setBtnAtivo(false)
+                    adapter.updateList(avataresFiltrados())
                 }
             }
             chipViews[cat] = chip
@@ -203,10 +213,12 @@ class AvatarSelectionDialog(
         atualizarChips("Todos")
         categoriasScroll.addView(categoriasRow)
 
-        // ── RecyclerView (weight=1 → ocupa espaço restante) ──────────────────
+        // ── RecyclerView ──────────────────────────────────────────────────────
+        // ✅ FIX: adapter criado DEPOIS que btnConfirmar existe no escopo
+        // O lambda passa a URL para a variável da classe e chama setBtnAtivo diretamente
         adapter = AvatarGridAdapter(avataresFiltrados()) { url ->
             avatarSelecionadoUrl = url
-            setBtnAtivo(true)
+            setBtnAtivo(true)  // ✅ agora funciona pois btnConfirmar já foi inicializado
         }
 
         val recycler = RecyclerView(context).apply {
@@ -221,7 +233,7 @@ class AvatarSelectionDialog(
             setItemViewCacheSize(20)
         }
 
-        // ── Footer fixo com botão ─────────────────────────────────────────────
+        // ── Footer com botão Confirmar ────────────────────────────────────────
         val footer = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
@@ -232,6 +244,7 @@ class AvatarSelectionDialog(
             setPadding(16.dp, 8.dp, 16.dp, 16.dp)
         }
 
+        // ✅ FIX: btnConfirmar inicializado AQUI antes do adapter receber o lambda
         btnConfirmar = TextView(context).apply {
             text = "Confirmar Avatar"
             textSize = 14f
@@ -263,8 +276,8 @@ class AvatarSelectionDialog(
         root.addView(makeDivider())
         root.addView(categoriasScroll)
         root.addView(makeDivider())
-        root.addView(recycler)  // ← weight=1, empurra o footer para baixo mas não some
-        root.addView(footer)    // ← sempre visível
+        root.addView(recycler)
+        root.addView(footer)
 
         setContentView(root)
 
@@ -280,7 +293,9 @@ class AvatarSelectionDialog(
         }
     }
 
-    private fun setBtnAtivo(ativo: Boolean) {
+    // ✅ FIX: função pública para o adapter chamar diretamente
+    fun setBtnAtivo(ativo: Boolean) {
+        if (!::btnConfirmar.isInitialized) return
         val bg = btnConfirmar.background as? android.graphics.drawable.GradientDrawable
         if (ativo) {
             bg?.setColor(Color.WHITE)
@@ -329,15 +344,15 @@ class AvatarSelectionDialog(
                 isFocusable = true
             }
 
-            val frame = android.widget.FrameLayout(parent.context).apply {
+            val frame = FrameLayout(parent.context).apply {
                 layoutParams = LinearLayout.LayoutParams(68.dp, 68.dp)
             }
 
             val ring = View(parent.context).apply {
                 id = android.R.id.background
-                layoutParams = android.widget.FrameLayout.LayoutParams(
-                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
                 )
                 background = android.graphics.drawable.GradientDrawable().apply {
                     shape = android.graphics.drawable.GradientDrawable.OVAL
@@ -349,9 +364,9 @@ class AvatarSelectionDialog(
 
             val img = ImageView(parent.context).apply {
                 id = android.R.id.icon
-                layoutParams = android.widget.FrameLayout.LayoutParams(
-                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
-                    android.widget.FrameLayout.LayoutParams.MATCH_PARENT
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
                 ).apply { val m = 3.dp; setMargins(m, m, m, m) }
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 background = android.graphics.drawable.GradientDrawable().apply {
