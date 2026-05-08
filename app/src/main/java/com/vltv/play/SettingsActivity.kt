@@ -553,7 +553,7 @@ class SettingsActivity : AppCompatActivity() {
             text = mensagem
             textSize = 13f
             setTextColor(Color.parseColor("#AAAAAA"))
-            lineSpacingMultiplier = 1.4f
+            setLineSpacing(0f, 1.4f)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -637,7 +637,7 @@ class SettingsActivity : AppCompatActivity() {
             text = mensagem
             textSize = 13f
             setTextColor(Color.parseColor("#AAAAAA"))
-            lineSpacingMultiplier = 1.5f
+            setLineSpacing(0f, 1.5f)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
