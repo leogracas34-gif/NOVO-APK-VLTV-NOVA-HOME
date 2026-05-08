@@ -62,6 +62,10 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var tvNextEpisodeTitle: TextView
     private lateinit var btnPlayNextEpisode: Button
 
+    // ── Novos botões de pular ─────────────────────────────────────────────────
+    private lateinit var btnSkipIntro: Button     // Pular abertura
+    private lateinit var btnSkipRecap: Button     // Pular resumo
+
     private var player: ExoPlayer? = null
 
     private var streamId = 0
@@ -77,8 +81,32 @@ class PlayerActivity : AppCompatActivity() {
 
     private var episodeList = ArrayList<Int>()
 
-    // ✅ CORRIGIDO: controla se está em PiP ativamente
     private var isInPiP = false
+
+    // ── Controle dos botões de pular ──────────────────────────────────────────
+    // Abertura: aparece dos 0s até INTRO_END_MS
+    private val INTRO_START_MS   = 0L
+    private val INTRO_END_MS     = 90_000L   // primeiros 1m30s
+
+    // Resumo: aparece dos RECAP_START_MS até RECAP_END_MS
+    private val RECAP_START_MS   = 0L
+    private val RECAP_END_MS     = 120_000L  // primeiros 2 minutos
+
+    // Pular abertura vai para este ponto
+    private val INTRO_SKIP_TO_MS = 90_000L   // pula para 1m30s
+
+    // Pular resumo vai para este ponto
+    private val RECAP_SKIP_TO_MS = 120_000L  // pula para 2min
+
+    // Próximo episódio: aparece quando faltam N segundos
+    // Calculado dinamicamente com base na duração real do episódio
+    private val NEXT_EP_BEFORE_END_MS = 60_000L  // aparece 60s antes do fim
+
+    // Flags para não repetir a lógica
+    private var introShown    = false
+    private var recapShown    = false
+    private var introHidden   = false
+    private var recapHidden   = false
 
     private val serverBackupList = listOf(
         "http://tvblack.shop",
@@ -98,42 +126,64 @@ class PlayerActivity : AppCompatActivity() {
 
     private val handler = Handler(Looper.getMainLooper())
 
-    private val SHOW_NEXT_EPISODE_SECONDS = 80L
-
-    private val nextChecker = object : Runnable {
+    // ── Checker unificado: próximo episódio + pular abertura + pular resumo ───
+    private val uiChecker = object : Runnable {
         override fun run() {
             val p = player ?: return
+            val pos = p.currentPosition
+            val dur = p.duration
 
+            // ── Próximo episódio (dinâmico) ───────────────────────────────────
             if (streamType == "series" && nextStreamId != 0) {
-                val dur = p.duration
-                val pos = p.currentPosition
-
-                if (dur > 0 && pos >= 0) {
+                if (dur > 0) {
                     val remaining = dur - pos
-                    val seconds = (remaining / 1000L).toInt().coerceAtLeast(0)
 
-                    if (remaining <= SHOW_NEXT_EPISODE_SECONDS * 1000L) {
+                    if (remaining in 1_000L..NEXT_EP_BEFORE_END_MS) {
+                        val seconds = (remaining / 1000L).coerceAtLeast(0)
                         tvNextEpisodeTitle.text = "Próximo episódio em ${seconds}s"
 
                         if (nextEpisodeContainer.visibility != View.VISIBLE) {
                             nextEpisodeContainer.visibility = View.VISIBLE
                             btnPlayNextEpisode.requestFocus()
                         }
-
-                        if (remaining <= 1000L) {
-                            nextEpisodeContainer.visibility = View.GONE
-                        }
+                    } else if (remaining <= 0) {
+                        nextEpisodeContainer.visibility = View.GONE
                     } else {
                         nextEpisodeContainer.visibility = View.GONE
                     }
-                } else {
-                    nextEpisodeContainer.visibility = View.GONE
                 }
-
-                handler.postDelayed(this, 1000L)
-            } else {
-                nextEpisodeContainer.visibility = View.GONE
             }
+
+            // ── Pular abertura ────────────────────────────────────────────────
+            // Mostra do início até INTRO_END_MS
+            if (streamType == "series") {
+                if (pos in INTRO_START_MS..INTRO_END_MS) {
+                    if (btnSkipIntro.visibility != View.VISIBLE) {
+                        btnSkipIntro.visibility = View.VISIBLE
+                    }
+                } else {
+                    if (btnSkipIntro.visibility == View.VISIBLE) {
+                        btnSkipIntro.visibility = View.GONE
+                    }
+                }
+            }
+
+            // ── Pular resumo ──────────────────────────────────────────────────
+            // Mostra do início até RECAP_END_MS, mas só se for a partir do ep 2+
+            // (se startPositionMs == 0 e streamType == series)
+            if (streamType == "series" && startPositionMs == 0L) {
+                if (pos in RECAP_START_MS..RECAP_END_MS) {
+                    if (btnSkipRecap.visibility != View.VISIBLE) {
+                        btnSkipRecap.visibility = View.VISIBLE
+                    }
+                } else {
+                    if (btnSkipRecap.visibility == View.VISIBLE) {
+                        btnSkipRecap.visibility = View.GONE
+                    }
+                }
+            }
+
+            handler.postDelayed(this, 500L)
         }
     }
 
@@ -150,16 +200,24 @@ class PlayerActivity : AppCompatActivity() {
             View.SYSTEM_UI_FLAG_FULLSCREEN or
             View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
 
-        playerView = findViewById(R.id.playerView)
-        loading = findViewById(R.id.loading)
+        playerView    = findViewById(R.id.playerView)
+        loading       = findViewById(R.id.loading)
         tvChannelName = findViewById(R.id.tvChannelName)
-        tvNowPlaying = findViewById(R.id.tvNowPlaying)
-        btnAspect = findViewById(R.id.btnAspect)
-        topBar = findViewById(R.id.topBar)
+        tvNowPlaying  = findViewById(R.id.tvNowPlaying)
+        btnAspect     = findViewById(R.id.btnAspect)
+        topBar        = findViewById(R.id.topBar)
 
         nextEpisodeContainer = findViewById(R.id.nextEpisodeContainer)
-        tvNextEpisodeTitle = findViewById(R.id.tvNextEpisodeTitle)
-        btnPlayNextEpisode = findViewById(R.id.btnPlayNextEpisode)
+        tvNextEpisodeTitle   = findViewById(R.id.tvNextEpisodeTitle)
+        btnPlayNextEpisode   = findViewById(R.id.btnPlayNextEpisode)
+
+        // ── Novos botões — adicione estes IDs no layout activity_player.xml ──
+        btnSkipIntro = findViewById(R.id.btnSkipIntro)
+        btnSkipRecap = findViewById(R.id.btnSkipRecap)
+
+        // Inicialmente ocultos
+        btnSkipIntro.visibility = View.GONE
+        btnSkipRecap.visibility = View.GONE
 
         btnPlayNextEpisode.isFocusable = true
         btnPlayNextEpisode.isFocusableInTouchMode = true
@@ -174,19 +232,34 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
 
-        streamId = intent.getIntExtra("stream_id", 0)
-        streamExtension = intent.getStringExtra("stream_ext") ?: "ts"
-        streamType = intent.getStringExtra("stream_type") ?: "live"
-        startPositionMs = intent.getLongExtra("start_position_ms", 0L)
-        nextStreamId = intent.getIntExtra("next_stream_id", 0)
-        nextChannelName = intent.getStringExtra("next_channel_name")
+        // ── Pular abertura ────────────────────────────────────────────────────
+        btnSkipIntro.setOnClickListener {
+            player?.let { p ->
+                val target = INTRO_SKIP_TO_MS.coerceAtMost(p.duration)
+                p.seekTo(target)
+            }
+            btnSkipIntro.visibility = View.GONE
+        }
 
-        currentProfile = intent.getStringExtra("PROFILE_NAME") ?: "Padrao"
+        // ── Pular resumo ──────────────────────────────────────────────────────
+        btnSkipRecap.setOnClickListener {
+            player?.let { p ->
+                val target = RECAP_SKIP_TO_MS.coerceAtMost(p.duration)
+                p.seekTo(target)
+            }
+            btnSkipRecap.visibility = View.GONE
+        }
+
+        streamId        = intent.getIntExtra("stream_id", 0)
+        streamExtension = intent.getStringExtra("stream_ext") ?: "ts"
+        streamType      = intent.getStringExtra("stream_type") ?: "live"
+        startPositionMs = intent.getLongExtra("start_position_ms", 0L)
+        nextStreamId    = intent.getIntExtra("next_stream_id", 0)
+        nextChannelName = intent.getStringExtra("next_channel_name")
+        currentProfile  = intent.getStringExtra("PROFILE_NAME") ?: "Padrao"
 
         val listaExtra = intent.getIntegerArrayListExtra("episode_list")
-        if (listaExtra != null) {
-            episodeList = listaExtra
-        }
+        if (listaExtra != null) episodeList = listaExtra
 
         calcularProximoEpisodioAutomaticamente()
 
@@ -194,8 +267,7 @@ class PlayerActivity : AppCompatActivity() {
 
         val channelName = intent.getStringExtra("channel_name") ?: ""
         tvChannelName.text = if (channelName.isNotBlank()) channelName else "Canal"
-
-        tvNowPlaying.text = if (streamType == "live") "Carregando programação..." else ""
+        tvNowPlaying.text  = if (streamType == "live") "Carregando programação..." else ""
 
         btnAspect.setOnClickListener {
             val current = playerView.resizeMode
@@ -223,11 +295,8 @@ class PlayerActivity : AppCompatActivity() {
         )
 
         btnPlayNextEpisode.setOnClickListener {
-            if (nextStreamId != 0) {
-                abrirProximoEpisodio()
-            } else {
-                Toast.makeText(this, "Sem próximo episódio", Toast.LENGTH_SHORT).show()
-            }
+            if (nextStreamId != 0) abrirProximoEpisodio()
+            else Toast.makeText(this, "Sem próximo episódio", Toast.LENGTH_SHORT).show()
         }
 
         if (streamType == "movie") {
@@ -243,25 +312,22 @@ class PlayerActivity : AppCompatActivity() {
         setupServerList()
         iniciarPlayer()
 
-        if (streamType == "live" && streamId != 0) {
-            carregarEpg()
-        }
+        if (streamType == "live" && streamId != 0) carregarEpg()
 
-        if (streamType == "series" && nextStreamId != 0) {
-            handler.removeCallbacks(nextChecker)
-            handler.post(nextChecker)
+        // Inicia o checker unificado para séries
+        if (streamType == "series") {
+            handler.removeCallbacks(uiChecker)
+            handler.post(uiChecker)
         }
     }
 
     override fun onUserLeaveHint() {
-        // ✅ CORRIGIDO: só entra em PiP se o player estiver tocando
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && player?.isPlaying == true) {
             val params = PictureInPictureParams.Builder()
                 .setAspectRatio(Rational(16, 9))
                 .build()
             enterPictureInPictureMode(params)
         } else {
-            // Se não estiver tocando, para completamente ao sair
             releasePlayerCompletely()
         }
         super.onUserLeaveHint()
@@ -276,37 +342,30 @@ class PlayerActivity : AppCompatActivity() {
             topBar.visibility = View.GONE
             loading.visibility = View.GONE
             nextEpisodeContainer.visibility = View.GONE
+            btnSkipIntro.visibility = View.GONE
+            btnSkipRecap.visibility = View.GONE
         } else {
             playerView.useController = true
             topBar.visibility = if (playerView.isControllerFullyVisible) View.VISIBLE else View.GONE
-
-            // ✅ CORRIGIDO: saiu do PiP sem fechar o app — para o áudio
             if (!isInPictureInPictureMode && !isFinishing) {
                 player?.pause()
             }
         }
     }
 
-    // ✅ CORRIGIDO: onPause para o áudio sempre que sair da tela
     override fun onPause() {
         super.onPause()
         val p = player ?: return
 
-        // Salva posição
-        if (streamType == "movie") {
-            saveMovieResume(streamId, p.currentPosition, p.duration)
-        } else if (streamType == "series") {
-            saveSeriesResume(streamId, p.currentPosition, p.duration)
-        }
+        if (streamType == "movie") saveMovieResume(streamId, p.currentPosition, p.duration)
+        else if (streamType == "series") saveSeriesResume(streamId, p.currentPosition, p.duration)
 
-        // Para o áudio se não estiver em PiP
         if (!isInPiP) {
             p.playWhenReady = false
             p.pause()
         }
     }
 
-    // ✅ CORRIGIDO: onResume retoma o player ao voltar para a tela
     override fun onResume() {
         super.onResume()
         if (!isInPiP && player != null) {
@@ -314,23 +373,17 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    // ✅ CORRIGIDO: onStop libera o player completamente ao sair
     override fun onStop() {
         super.onStop()
-        if (!isInPiP) {
-            releasePlayerCompletely()
-        }
+        if (!isInPiP) releasePlayerCompletely()
     }
 
     override fun onDestroy() {
-        handler.removeCallbacks(nextChecker)
+        handler.removeCallbacks(uiChecker)
         val p = player
         if (p != null) {
-            if (streamType == "movie") {
-                saveMovieResume(streamId, p.currentPosition, p.duration)
-            } else if (streamType == "series") {
-                saveSeriesResume(streamId, p.currentPosition, p.duration)
-            }
+            if (streamType == "movie") saveMovieResume(streamId, p.currentPosition, p.duration)
+            else if (streamType == "series") saveSeriesResume(streamId, p.currentPosition, p.duration)
         }
         releasePlayerCompletely()
         super.onDestroy()
@@ -352,8 +405,10 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun releasePlayerCompletely() {
-        handler.removeCallbacks(nextChecker)
+        handler.removeCallbacks(uiChecker)
         nextEpisodeContainer.visibility = View.GONE
+        btnSkipIntro.visibility = View.GONE
+        btnSkipRecap.visibility = View.GONE
 
         player?.let { exoPlayer ->
             try {
@@ -365,9 +420,7 @@ class PlayerActivity : AppCompatActivity() {
 
             playerView.player = null
 
-            try {
-                exoPlayer.release()
-            } catch (e: Exception) { }
+            try { exoPlayer.release() } catch (e: Exception) { }
         }
         player = null
     }
@@ -454,14 +507,13 @@ class PlayerActivity : AppCompatActivity() {
                 player?.addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(state: Int) {
                         when (state) {
-                            Player.STATE_READY -> loading.visibility = View.GONE
+                            Player.STATE_READY    -> loading.visibility = View.GONE
                             Player.STATE_BUFFERING -> loading.visibility = View.VISIBLE
                         }
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
                         Toast.makeText(this@PlayerActivity, "Erro ao reproduzir arquivo: ${error.message}", Toast.LENGTH_LONG).show()
-                        Log.e("PLAYER_OFFLINE", "Erro: ${error.message}")
                     }
                 })
             } catch (e: Exception) {
@@ -486,19 +538,19 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         val currentServer = activeServerList[serverIndex]
-        val currentExt = extensoesTentativa[extIndex]
+        val currentExt    = extensoesTentativa[extIndex]
 
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        val user = prefs.getString("username", "") ?: ""
-        val pass = prefs.getString("password", "") ?: ""
+        val user  = prefs.getString("username", "") ?: ""
+        val pass  = prefs.getString("password", "") ?: ""
 
         val url = montarUrlStream(
-            server = currentServer,
+            server     = currentServer,
             streamType = streamType,
-            user = user,
-            pass = pass,
-            id = streamId,
-            ext = currentExt
+            user       = user,
+            pass       = pass,
+            id         = streamId,
+            ext        = currentExt
         )
 
         releasePlayerCompletely()
@@ -511,19 +563,14 @@ class PlayerActivity : AppCompatActivity() {
 
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
-        val isLive = streamType == "live"
-        val minBufferMs = 2000
-        val maxBufferMs = if (isLive) 5000 else 15000
-        val playBufferMs = 1000
+        val isLive        = streamType == "live"
+        val minBufferMs   = 2000
+        val maxBufferMs   = if (isLive) 5000 else 15000
+        val playBufferMs  = 1000
         val playRebufferMs = 2000
 
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                minBufferMs,
-                maxBufferMs,
-                playBufferMs,
-                playRebufferMs
-            )
+            .setBufferDurationsMs(minBufferMs, maxBufferMs, playBufferMs, playRebufferMs)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
@@ -561,9 +608,10 @@ class PlayerActivity : AppCompatActivity() {
                     Player.STATE_READY -> {
                         loading.visibility = View.GONE
 
-                        if (streamType == "series" && nextStreamId != 0) {
-                            handler.removeCallbacks(nextChecker)
-                            handler.post(nextChecker)
+                        // Inicia o checker quando o player estiver pronto
+                        if (streamType == "series") {
+                            handler.removeCallbacks(uiChecker)
+                            handler.post(uiChecker)
                         }
                     }
 
@@ -571,6 +619,8 @@ class PlayerActivity : AppCompatActivity() {
 
                     Player.STATE_ENDED -> {
                         nextEpisodeContainer.visibility = View.GONE
+                        btnSkipIntro.visibility = View.GONE
+                        btnSkipRecap.visibility = View.GONE
 
                         if (streamType == "movie") {
                             clearMovieResume(streamId)
@@ -610,10 +660,10 @@ class PlayerActivity : AppCompatActivity() {
             if (match != null) {
                 try {
                     val textoCompletoEncontrado = match.groupValues[0]
-                    val prefixo = match.groupValues[1]
+                    val prefixo   = match.groupValues[1]
                     val numeroStr = match.groupValues[2]
                     val numeroAtual = numeroStr.toInt()
-                    val novoNumero = numeroAtual + 1
+                    val novoNumero  = numeroAtual + 1
                     val novoNumeroStr = if (numeroStr.length > 1 && novoNumero < 10)
                         "0$novoNumero" else novoNumero.toString()
                     novoTitulo = tituloAtual.replace(textoCompletoEncontrado, "$prefixo$novoNumeroStr")
@@ -626,9 +676,9 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         val intent = Intent(this, PlayerActivity::class.java)
-        intent.putExtra("stream_id", nextStreamId)
-        intent.putExtra("stream_ext", "mp4")
-        intent.putExtra("stream_type", "series")
+        intent.putExtra("stream_id",    nextStreamId)
+        intent.putExtra("stream_ext",   "mp4")
+        intent.putExtra("stream_type",  "series")
         intent.putExtra("channel_name", novoTitulo)
         intent.putExtra("PROFILE_NAME", currentProfile)
 
@@ -644,15 +694,14 @@ class PlayerActivity : AppCompatActivity() {
         return if (ext.isBlank()) "$base/$streamType/$user/$pass/$id" else "$base/$streamType/$user/$pass/$id.$ext"
     }
 
-    private fun getMovieKey(id: Int) = "${currentProfile}_movie_resume_$id"
+    private fun getMovieKey(id: Int)  = "${currentProfile}_movie_resume_$id"
+    private fun getSeriesKey(id: Int) = "${currentProfile}_series_resume_$id"
 
     private fun saveMovieResume(id: Int, positionMs: Long, durationMs: Long) {
         if (durationMs <= 0L) return
         val percent = positionMs.toDouble() / durationMs.toDouble()
-        if (positionMs < 30_000L || percent > 0.95) {
-            clearMovieResume(id)
-            return
-        }
+        if (positionMs < 30_000L || percent > 0.95) { clearMovieResume(id); return }
+
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         prefs.edit()
             .putLong("${getMovieKey(id)}_pos", positionMs)
@@ -666,14 +715,14 @@ class PlayerActivity : AppCompatActivity() {
             try {
                 database.streamDao().saveWatchHistory(
                     WatchHistoryEntity(
-                        stream_id = id,
+                        stream_id    = id,
                         profile_name = currentProfile,
-                        name = tvChannelName.text.toString(),
-                        icon = intent.getStringExtra("icon") ?: "",
+                        name         = tvChannelName.text.toString(),
+                        icon         = intent.getStringExtra("icon") ?: "",
                         last_position = positionMs,
-                        duration = durationMs,
-                        is_series = false,
-                        timestamp = System.currentTimeMillis()
+                        duration     = durationMs,
+                        is_series    = false,
+                        timestamp    = System.currentTimeMillis()
                     )
                 )
             } catch (e: Exception) { }
@@ -688,15 +737,11 @@ class PlayerActivity : AppCompatActivity() {
             .apply()
     }
 
-    private fun getSeriesKey(episodeStreamId: Int) = "${currentProfile}_series_resume_$episodeStreamId"
-
     private fun saveSeriesResume(id: Int, positionMs: Long, durationMs: Long) {
         if (durationMs <= 0L) return
         val percent = positionMs.toDouble() / durationMs.toDouble()
-        if (positionMs < 30_000L || percent > 0.95) {
-            clearSeriesResume(id)
-            return
-        }
+        if (positionMs < 30_000L || percent > 0.95) { clearSeriesResume(id); return }
+
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         prefs.edit()
             .putLong("${getSeriesKey(id)}_pos", positionMs)
@@ -710,14 +755,14 @@ class PlayerActivity : AppCompatActivity() {
             try {
                 database.streamDao().saveWatchHistory(
                     WatchHistoryEntity(
-                        stream_id = id,
+                        stream_id    = id,
                         profile_name = currentProfile,
-                        name = tvChannelName.text.toString(),
-                        icon = intent.getStringExtra("icon") ?: "",
+                        name         = tvChannelName.text.toString(),
+                        icon         = intent.getStringExtra("icon") ?: "",
                         last_position = positionMs,
-                        duration = durationMs,
-                        is_series = true,
-                        timestamp = System.currentTimeMillis()
+                        duration     = durationMs,
+                        is_series    = true,
+                        timestamp    = System.currentTimeMillis()
                     )
                 )
             } catch (e: Exception) { }
@@ -733,9 +778,9 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun salvarNoHistoricoLocal(id: String) {
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        val prefs  = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         val keyIds = "${currentProfile}_local_history_ids"
-        val ids = prefs.getStringSet(keyIds, mutableSetOf())?.toMutableSet() ?: mutableSetOf()
+        val ids    = prefs.getStringSet(keyIds, mutableSetOf())?.toMutableSet() ?: mutableSetOf()
         ids.add(id)
         prefs.edit().apply {
             putStringSet(keyIds, ids)
@@ -746,18 +791,18 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun salvarNoFirebase(id: Int, positionMs: Long, durationMs: Long) {
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        val prefs     = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         val userEmail = prefs.getString("username", "") ?: ""
         if (userEmail.isBlank()) return
 
-        val db = FirebaseFirestore.getInstance()
+        val db   = FirebaseFirestore.getInstance()
         val data = hashMapOf(
-            "id" to id.toString(),
-            "name" to tvChannelName.text.toString(),
+            "id"         to id.toString(),
+            "name"       to tvChannelName.text.toString(),
             "streamIcon" to (intent.getStringExtra("icon") ?: ""),
             "positionMs" to positionMs,
             "durationMs" to durationMs,
-            "timestamp" to com.google.firebase.Timestamp.now()
+            "timestamp"  to com.google.firebase.Timestamp.now()
         )
 
         db.collection("users")
@@ -772,19 +817,14 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun decodeBase64(text: String?): String {
         return try {
-            if (text.isNullOrEmpty()) "" else String(
-                Base64.decode(text, Base64.DEFAULT),
-                Charsets.UTF_8
-            )
-        } catch (e: Exception) {
-            text ?: ""
-        }
+            if (text.isNullOrEmpty()) "" else String(Base64.decode(text, Base64.DEFAULT), Charsets.UTF_8)
+        } catch (e: Exception) { text ?: "" }
     }
 
     private fun carregarEpg() {
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        val user = prefs.getString("username", "") ?: ""
-        val pass = prefs.getString("password", "") ?: ""
+        val user  = prefs.getString("username", "") ?: ""
+        val pass  = prefs.getString("password", "") ?: ""
 
         if (user.isBlank() || pass.isBlank()) {
             tvNowPlaying.text = "Sem informação de programação"
@@ -792,20 +832,20 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         XtreamApi.service.getShortEpg(
-            user = user,
-            pass = pass,
+            user     = user,
+            pass     = pass,
             streamId = streamId.toString(),
-            limit = 2
+            limit    = 2
         ).enqueue(object : Callback<EpgWrapper> {
             override fun onResponse(call: Call<EpgWrapper>, response: Response<EpgWrapper>) {
                 if (!response.isSuccessful || response.body()?.epg_listings.isNullOrEmpty()) {
                     tvNowPlaying.text = "Sem informação de programação"
                     return
                 }
-                val epg = response.body()!!.epg_listings!!.firstOrNull() ?: return
+                val epg    = response.body()!!.epg_listings!!.firstOrNull() ?: return
                 val titulo = decodeBase64(epg.title)
                 val inicio = epg.start ?: ""
-                val fim = epg.stop ?: epg.end.orEmpty()
+                val fim    = epg.stop ?: epg.end.orEmpty()
                 tvNowPlaying.text = if (inicio.isNotBlank()) "$titulo ($inicio - $fim)" else titulo
             }
 
@@ -817,8 +857,8 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val keyCode = event.keyCode
-        val action = event.action
-        val p = player ?: return super.dispatchKeyEvent(event)
+        val action  = event.action
+        val p       = player ?: return super.dispatchKeyEvent(event)
 
         if (action == KeyEvent.ACTION_DOWN) {
             when (keyCode) {
@@ -827,7 +867,6 @@ class PlayerActivity : AppCompatActivity() {
                         btnPlayNextEpisode.performClick()
                         return true
                     }
-
                     if (playerView.isControllerFullyVisible) {
                         if (p.isPlaying) p.pause() else p.play()
                     } else {
@@ -841,9 +880,7 @@ class PlayerActivity : AppCompatActivity() {
                         btnPlayNextEpisode.requestFocus()
                         return true
                     }
-                    if (!playerView.isControllerFullyVisible) {
-                        playerView.showController()
-                    }
+                    if (!playerView.isControllerFullyVisible) playerView.showController()
                     val seekBar = playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress)
                     seekBar?.requestFocus()
                     return true
