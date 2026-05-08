@@ -68,7 +68,6 @@ class SettingsActivity : AppCompatActivity() {
 
         switchParental.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                // Pede confirmação antes de ativar
                 mostrarDialogConfirmacao(
                     titulo   = "Ativar Controle Parental",
                     mensagem = "O controle parental bloqueará conteúdo adulto em todas as telas. Defina um PIN de 4 dígitos para proteger as configurações.",
@@ -79,10 +78,7 @@ class SettingsActivity : AppCompatActivity() {
                     layoutPin.visibility = View.VISIBLE
                     mostrarToastPremium("Controle parental ativado ✓")
                 }
-                // Se cancelar, volta o switch
-                // Precisa do bloco else para reverter o switch se o usuário cancelar
             } else {
-                // Pede o PIN antes de desativar
                 verificarPinParaAcao("Desativar controle parental?") {
                     ParentalControlManager.setEnabled(this, false)
                     layoutPin.visibility = View.GONE
@@ -167,7 +163,6 @@ class SettingsActivity : AppCompatActivity() {
     private fun mostrarOpcoesEdicao(perfil: ProfileEntity) {
         val isAtivo = perfil.name == currentProfileName
 
-        // Dialog premium customizado com opções
         val dialog = android.app.Dialog(this)
         dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
 
@@ -177,7 +172,6 @@ class SettingsActivity : AppCompatActivity() {
             setPadding(0, 0, 0, 0)
         }
 
-        // Header com avatar + nome
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -260,7 +254,6 @@ class SettingsActivity : AppCompatActivity() {
         root.addView(header)
         root.addView(divider())
 
-        // ✅ Opção: Selecionar este perfil
         if (!isAtivo) {
             root.addView(opcao("👤", "Usar este perfil") {
                 trocarPerfilAtivo(perfil)
@@ -268,18 +261,15 @@ class SettingsActivity : AppCompatActivity() {
             root.addView(divider())
         }
 
-        // Opção: Editar nome
         root.addView(opcao("✏️", "Editar nome") {
             editarNomePerfil(perfil)
         })
         root.addView(divider())
 
-        // Opção: Trocar avatar
         root.addView(opcao("🖼️", "Trocar avatar") {
             trocarAvatarPerfil(perfil)
         })
 
-        // Opção: Excluir (não aparece se for o perfil ativo)
         if (!isAtivo) {
             root.addView(divider())
             root.addView(opcao("🗑️", "Excluir perfil", Color.parseColor("#FF5252")) {
@@ -288,7 +278,6 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         root.addView(divider())
-        // Botão cancelar
         root.addView(TextView(this).apply {
             text = "Cancelar"
             textSize = 14f
@@ -324,7 +313,6 @@ class SettingsActivity : AppCompatActivity() {
         currentProfileName = perfil.name
         currentProfileIcon = perfil.imageUrl
         mostrarToastPremium("Perfil alterado para ${perfil.name}")
-        // Volta para a Home com o novo perfil
         startActivity(Intent(this, HomeActivity::class.java).apply {
             putExtra("PROFILE_NAME", perfil.name)
             putExtra("PROFILE_ICON", perfil.imageUrl ?: "")
@@ -349,14 +337,17 @@ class SettingsActivity : AppCompatActivity() {
                 val perfilAtualizado = perfil.copy(name = novoNome)
                 database.streamDao().updateProfile(perfilAtualizado)
 
-                // Se era o perfil ativo, atualiza as prefs
+                // Se era o perfil ativo, atualiza as prefs (ainda no IO)
                 if (perfil.name == currentProfileName) {
                     getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE).edit()
                         .putString("last_profile_name", novoNome).apply()
-                    currentProfileName = novoNome
                 }
 
                 withContext(Dispatchers.Main) {
+                    // ✅ CORREÇÃO: atribuição movida para a thread principal
+                    if (perfil.name == currentProfileName) {
+                        currentProfileName = novoNome
+                    }
                     mostrarToastPremium("Nome atualizado ✓")
                     carregarPerfis()
                 }
@@ -371,14 +362,17 @@ class SettingsActivity : AppCompatActivity() {
                 val perfilAtualizado = perfil.copy(imageUrl = novaUrl)
                 database.streamDao().updateProfile(perfilAtualizado)
 
-                // Se era o perfil ativo, atualiza as prefs
+                // Se era o perfil ativo, atualiza as prefs (ainda no IO)
                 if (perfil.name == currentProfileName) {
                     getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE).edit()
                         .putString("last_profile_icon", novaUrl).apply()
-                    currentProfileIcon = novaUrl
                 }
 
                 withContext(Dispatchers.Main) {
+                    // ✅ CORREÇÃO: atribuição movida para a thread principal
+                    if (perfil.name == currentProfileName) {
+                        currentProfileIcon = novaUrl
+                    }
                     mostrarToastPremium("Avatar atualizado ✓")
                     carregarPerfis()
                 }
@@ -480,7 +474,6 @@ class SettingsActivity : AppCompatActivity() {
             isClickable = true
             isFocusable = true
             setOnClickListener {
-                // Reverte o switch ao cancelar
                 val sw = findViewById<Switch>(R.id.switchParental)
                 sw?.isChecked = ParentalControlManager.isEnabled(this@SettingsActivity)
                 dialog.dismiss()
@@ -773,7 +766,6 @@ class SettingsActivity : AppCompatActivity() {
             val perfil = list[position]
             holder.tvName.text = perfil.name
 
-            // ✅ Avatar HD com fade
             Glide.with(this@SettingsActivity)
                 .load(perfil.imageUrl)
                 .format(DecodeFormat.PREFER_ARGB_8888)
@@ -785,7 +777,6 @@ class SettingsActivity : AppCompatActivity() {
                 .error(R.drawable.ic_profile_placeholder)
                 .into(holder.img)
 
-            // Destaque do perfil ativo
             val isAtivo = perfil.name == currentProfileName
             holder.itemView.alpha = if (isAtivo) 1.0f else 0.55f
             holder.img.setBackgroundResource(
