@@ -43,6 +43,7 @@ class LoginActivity : AppCompatActivity() {
         "http://redeinternadestiny.top",
         "http://blackstartv.shop",
         "http://blackdns.shop",
+        "http://topcdn.fun",
         "http://ranos.sbs",
         "http://cmdtv.casa",
         "http://cmdtv.pro",
