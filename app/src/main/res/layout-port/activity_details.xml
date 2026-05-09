@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:background="#060610">
 
-    <!-- ── Background full-height com parallax visual ── -->
+    <!-- Background -->
     <ImageView
         android:id="@+id/imgBackground"
         android:layout_width="match_parent"
@@ -14,13 +14,12 @@
         android:scaleType="centerCrop"
         android:alpha="0.92"/>
 
-    <!-- Gradiente triplo sobre o background -->
     <View
         android:layout_width="match_parent"
         android:layout_height="480dp"
         android:background="@drawable/bg_details_scrim"/>
 
-    <!-- ── Scroll principal ── -->
+    <!-- Scroll principal -->
     <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
@@ -33,10 +32,9 @@
             android:orientation="vertical"
             android:paddingBottom="88dp">
 
-            <!-- Espaço para o background aparecer -->
             <View android:layout_width="match_parent" android:layout_height="180dp"/>
 
-            <!-- Logo do título -->
+            <!-- Logo -->
             <ImageView
                 android:id="@+id/imgTitleLogo"
                 android:layout_width="260dp"
@@ -45,7 +43,7 @@
                 android:scaleType="fitCenter"
                 android:visibility="gone"/>
 
-            <!-- Título texto fallback -->
+            <!-- Título -->
             <TextView
                 android:id="@+id/tvTitle"
                 android:layout_width="match_parent"
@@ -60,7 +58,7 @@
                 android:shadowRadius="8"
                 android:letterSpacing="0.01"/>
 
-            <!-- Metadados: avaliação + ano + qualidade -->
+            <!-- Metadados -->
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -99,7 +97,6 @@
                     android:textColor="#FFFFFF"
                     android:textSize="9sp"
                     android:textStyle="bold"/>
-
             </LinearLayout>
 
             <!-- Gênero -->
@@ -112,7 +109,10 @@
                 android:textColor="#88FFFFFF"
                 android:textSize="11sp"/>
 
-            <!-- Barra de progresso -->
+            <!-- ══════════════════════════════════════════════════════════
+                 BARRA DE PROGRESSO + REINICIAR
+                 Aparece quando há posição salva
+                 ══════════════════════════════════════════════════════════ -->
             <LinearLayout
                 android:id="@+id/layoutProgress"
                 android:layout_width="match_parent"
@@ -132,10 +132,11 @@
                         android:id="@+id/progressBarMovie"
                         style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="0dp"
-                        android:layout_height="3dp"
+                        android:layout_height="4dp"
                         android:layout_weight="1"
                         android:progressDrawable="@drawable/progress_horizontal_disney"
-                        android:progressBackgroundTint="#33FFFFFF"/>
+                        android:progressBackgroundTint="#33FFFFFF"
+                        android:progress="0"/>
 
                     <TextView
                         android:id="@+id/tvTimeRemaining"
@@ -144,9 +145,9 @@
                         android:layout_marginStart="8dp"
                         android:textColor="#88FFFFFF"
                         android:textSize="10sp"/>
-
                 </LinearLayout>
 
+                <!-- Botão "Assistir do início" -->
                 <LinearLayout
                     android:id="@+id/btnRestartAction"
                     android:layout_width="wrap_content"
@@ -160,11 +161,13 @@
                     android:focusable="true"
                     android:background="?attr/selectableItemBackground"
                     android:visibility="gone">
+
                     <ImageView
                         android:layout_width="14dp"
                         android:layout_height="14dp"
                         android:src="@android:drawable/ic_menu_rotate"
                         app:tint="#88FFFFFF"/>
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -173,10 +176,11 @@
                         android:textSize="11sp"
                         android:layout_marginStart="5dp"/>
                 </LinearLayout>
-
             </LinearLayout>
 
-            <!-- Botão ASSISTIR principal — branco sólido estilo Netflix -->
+            <!-- ══════════════════════════════════════════════════════════
+                 BOTÃO ASSISTIR (padrão) — fica visível sempre
+                 ══════════════════════════════════════════════════════════ -->
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnPlay"
                 android:layout_width="match_parent"
@@ -190,14 +194,25 @@
                 android:textStyle="bold"
                 android:letterSpacing="0.04"/>
 
-            <!-- Botão CONTINUAR (oculto por padrão) -->
+            <!-- ══════════════════════════════════════════════════════════
+                 BOTÃO CONTINUAR — aparece por cima do ASSISTIR via
+                 visibilidade, mas está no mesmo espaço
+                 ══════════════════════════════════════════════════════════ -->
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/btnResume"
-                android:layout_width="0dp"
-                android:layout_height="0dp"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginHorizontal="18dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_btn_white"
+                android:text="▶  CONTINUAR"
+                android:textColor="#000000"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.04"
                 android:visibility="gone"/>
 
-            <!-- Ações secundárias: Reiniciar / Trailer / Favoritar / Baixar -->
+            <!-- Ações secundárias -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -205,20 +220,6 @@
                 android:orientation="horizontal"
                 android:gravity="center"
                 android:paddingHorizontal="8dp">
-
-                <LinearLayout
-                    android:id="@+id/btnRestartActionAlt"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:visibility="gone">
-                    <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@android:drawable/ic_menu_rotate" app:tint="#CCFFFFFF"/>
-                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="REINICIAR" android:textColor="#AAFFFFFF" android:textSize="9sp" android:layout_marginTop="4dp" android:letterSpacing="0.05"/>
-                </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/btnTrailerAction"
@@ -298,7 +299,7 @@
                 android:layout_marginTop="16dp"
                 android:background="#1AFFFFFF"/>
 
-            <!-- Abas: Sugestões / Extras / Detalhes -->
+            <!-- Abas -->
             <com.google.android.material.tabs.TabLayout
                 android:id="@+id/tabLayoutDetails"
                 android:layout_width="match_parent"
@@ -354,15 +355,13 @@
                     <TextView android:id="@+id/tvDetailGenre" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#88FFFFFF" android:textSize="11sp" android:layout_marginBottom="8dp"/>
                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Direção" android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="11sp"/>
                     <TextView android:id="@+id/tvDetailDirector" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#88FFFFFF" android:textSize="11sp"/>
-
                 </LinearLayout>
-
             </FrameLayout>
 
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
 
-    <!-- Views ocultas mantidas para compatibilidade com o código Kotlin -->
+    <!-- Views ocultas para compatibilidade -->
     <ImageView android:id="@+id/imgPoster" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
     <Button android:id="@+id/btnSettings" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
     <TextView android:id="@+id/tvEpisodesTitle" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
