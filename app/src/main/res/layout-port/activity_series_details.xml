@@ -10,7 +10,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <!-- AppBarLayout SEM TabLayout — só hero + botões -->
         <com.google.android.material.appbar.AppBarLayout
             android:id="@+id/appBar"
             android:layout_width="match_parent"
@@ -98,7 +97,6 @@
                                 android:layout_height="wrap_content"
                                 android:textColor="#CCCCCC"
                                 android:textSize="12sp"/>
-
                         </LinearLayout>
 
                         <LinearLayout
@@ -113,44 +111,18 @@
                             <TextView android:id="@+id/tvBadgeDolby" android:text="ATMOS" android:background="#33FFFFFF" android:paddingHorizontal="4dp" android:layout_marginEnd="4dp" android:textColor="#FFF" android:textSize="10sp" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:visibility="gone"/>
                             <TextView android:id="@+id/tvBadge51" android:text="5.1" android:background="#33FFFFFF" android:paddingHorizontal="4dp" android:layout_marginEnd="4dp" android:textColor="#FFF" android:textSize="10sp" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content" android:visibility="gone"/>
                         </LinearLayout>
-
                     </LinearLayout>
 
-                    <FrameLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="20dp">
-
-                        <Button
-                            android:id="@+id/btnPlay"
-                            android:layout_width="match_parent"
-                            android:layout_height="50dp"
-                            android:backgroundTint="#FFFFFF"
-                            android:text="▶ ASSISTIR"
-                            android:textColor="#000000"
-                            android:textStyle="bold"
-                            android:textSize="15sp"/>
-
-                        <Button
-                            android:id="@+id/btnResume"
-                            android:layout_width="match_parent"
-                            android:layout_height="50dp"
-                            android:backgroundTint="#FFFFFF"
-                            android:text="▶ CONTINUAR"
-                            android:textColor="#000000"
-                            android:textStyle="bold"
-                            android:textSize="15sp"
-                            android:visibility="gone"/>
-
-                    </FrameLayout>
-
+                    <!-- ══════════════════════════════════════════════════
+                         BARRA DE PROGRESSO — aparece quando há resume
+                         ══════════════════════════════════════════════════ -->
                     <LinearLayout
                         android:id="@+id/layoutProgress"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:visibility="gone"
-                        android:layout_marginTop="10dp">
+                        android:layout_marginTop="14dp"
+                        android:visibility="gone">
 
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -162,7 +134,7 @@
                                 android:id="@+id/progressBarMovie"
                                 style="?android:attr/progressBarStyleHorizontal"
                                 android:layout_width="0dp"
-                                android:layout_height="3dp"
+                                android:layout_height="4dp"
                                 android:layout_weight="1"
                                 android:progressBackgroundTint="#333333"
                                 android:progress="0"/>
@@ -175,9 +147,9 @@
                                 android:textColor="#CCCCCC"
                                 android:textSize="10sp"
                                 android:layout_marginStart="8dp"/>
-
                         </LinearLayout>
 
+                        <!-- Botão reiniciar -->
                         <LinearLayout
                             android:id="@+id/btnRestartAction"
                             android:layout_width="wrap_content"
@@ -189,7 +161,8 @@
                             android:padding="8dp"
                             android:clickable="true"
                             android:focusable="true"
-                            android:background="?attr/selectableItemBackground">
+                            android:background="?attr/selectableItemBackground"
+                            android:visibility="gone">
 
                             <ImageView
                                 android:layout_width="14dp"
@@ -204,11 +177,39 @@
                                 android:textColor="#CCCCCC"
                                 android:textSize="11sp"
                                 android:layout_marginStart="5dp"/>
-
                         </LinearLayout>
-
                     </LinearLayout>
 
+                    <!-- ══════════════════════════════════════════════════
+                         BOTÃO ASSISTIR (padrão, sempre visível)
+                         ══════════════════════════════════════════════════ -->
+                    <Button
+                        android:id="@+id/btnPlay"
+                        android:layout_width="match_parent"
+                        android:layout_height="50dp"
+                        android:layout_marginTop="14dp"
+                        android:backgroundTint="#FFFFFF"
+                        android:text="▶ ASSISTIR"
+                        android:textColor="#000000"
+                        android:textStyle="bold"
+                        android:textSize="15sp"/>
+
+                    <!-- ══════════════════════════════════════════════════
+                         BOTÃO CONTINUAR (aparece quando há resume salvo)
+                         ══════════════════════════════════════════════════ -->
+                    <Button
+                        android:id="@+id/btnResume"
+                        android:layout_width="match_parent"
+                        android:layout_height="50dp"
+                        android:layout_marginTop="8dp"
+                        android:backgroundTint="#FFFFFF"
+                        android:text="▶ CONTINUAR"
+                        android:textColor="#000000"
+                        android:textStyle="bold"
+                        android:textSize="15sp"
+                        android:visibility="gone"/>
+
+                    <!-- Botões secundários: favoritar -->
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -240,7 +241,6 @@
                                 android:textColor="#FFFFFF"
                                 android:textSize="9sp"
                                 android:layout_marginTop="4dp"/>
-
                         </LinearLayout>
 
                         <LinearLayout
@@ -269,18 +269,14 @@
                                 android:textColor="#FFFFFF"
                                 android:textSize="9sp"
                                 android:layout_marginTop="4dp"/>
-
                         </LinearLayout>
-
                     </LinearLayout>
 
                 </LinearLayout>
-
             </com.google.android.material.appbar.CollapsingToolbarLayout>
-
         </com.google.android.material.appbar.AppBarLayout>
 
-        <!-- NestedScrollView com TabLayout FIXO no topo -->
+        <!-- NestedScrollView com TabLayout fixo -->
         <androidx.core.widget.NestedScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -294,7 +290,7 @@
                 android:orientation="vertical"
                 android:paddingBottom="88dp">
 
-                <!-- ✅ TabLayout aqui — sempre visível desde o primeiro frame -->
+                <!-- TabLayout fixo no topo do scroll -->
                 <com.google.android.material.tabs.TabLayout
                     android:id="@+id/tabLayout"
                     android:layout_width="match_parent"
@@ -339,7 +335,6 @@
                             android:textSize="13sp"
                             android:textStyle="bold"
                             android:gravity="center"/>
-
                     </androidx.cardview.widget.CardView>
 
                     <Button
@@ -347,7 +342,6 @@
                         android:layout_width="0dp"
                         android:layout_height="0dp"
                         android:visibility="gone"/>
-
                 </RelativeLayout>
 
                 <!-- Episódios -->
@@ -400,7 +394,6 @@
                 <TextView android:id="@+id/btnCloseSeasonSelectorText" android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone"/>
 
             </LinearLayout>
-
         </androidx.core.widget.NestedScrollView>
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
