@@ -3,7 +3,10 @@ package com.vltv.play
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -14,6 +17,14 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -37,6 +48,8 @@ import okhttp3.ResponseBody
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import org.json.JSONObject
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 
 class LiveTvActivity : AppCompatActivity() {
 
@@ -44,6 +57,31 @@ class LiveTvActivity : AppCompatActivity() {
     private lateinit var rvChannels: RecyclerView
     private lateinit var progressBar: ProgressBar
     private lateinit var tvCategoryTitle: TextView
+
+    // ── Mini player views ─────────────────────────────────────────────────────
+    private lateinit var miniPlayerContainer: View
+    private lateinit var miniPlayerView: PlayerView
+    private lateinit var miniLoading: ProgressBar
+    private lateinit var tvMiniChannelName: TextView
+    private lateinit var btnMiniClose: TextView
+    private lateinit var miniPlayerFrame: View
+
+    // EPG views
+    private lateinit var tvEpgNow: TextView
+    private lateinit var tvEpgNowTime: TextView
+    private lateinit var tvEpgNext1: TextView
+    private lateinit var tvEpgNext1Time: TextView
+    private lateinit var tvEpgNext2: TextView
+    private lateinit var tvEpgNext2Time: TextView
+    private lateinit var tvEpgNext3: TextView
+    private lateinit var tvEpgNext3Time: TextView
+
+    private var miniPlayer: ExoPlayer? = null
+    private var currentMiniChannel: LiveStream? = null
+
+    // Duplo clique
+    private var lastClickTime = 0L
+    private val DOUBLE_CLICK_MS = 400L
 
     private var username = ""
     private var password = ""
@@ -54,7 +92,6 @@ class LiveTvActivity : AppCompatActivity() {
     private var categoryAdapter: CategoryAdapter? = null
     private var channelAdapter: ChannelAdapter? = null
 
-    // ✅ Detecta se é TV para ajustar zoom e colunas
     private fun isTvDevice(): Boolean {
         return packageManager.hasSystemFeature("android.software.leanback") ||
                packageManager.hasSystemFeature("android.hardware.type.television") ||
@@ -71,10 +108,38 @@ class LiveTvActivity : AppCompatActivity() {
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
 
-        rvCategories = findViewById(R.id.rvCategories)
-        rvChannels = findViewById(R.id.rvChannels)
-        progressBar = findViewById(R.id.progressBar)
+        rvCategories    = findViewById(R.id.rvCategories)
+        rvChannels      = findViewById(R.id.rvChannels)
+        progressBar     = findViewById(R.id.progressBar)
         tvCategoryTitle = findViewById(R.id.tvCategoryTitle)
+
+        // Mini player
+        miniPlayerContainer = findViewById(R.id.miniPlayerContainer)
+        miniPlayerView      = miniPlayerContainer.findViewById(R.id.miniPlayerView)
+        miniLoading         = miniPlayerContainer.findViewById(R.id.miniLoading)
+        tvMiniChannelName   = miniPlayerContainer.findViewById(R.id.tvMiniChannelName)
+        btnMiniClose        = miniPlayerContainer.findViewById(R.id.btnMiniClose)
+        miniPlayerFrame     = miniPlayerContainer.findViewById(R.id.miniPlayerFrame)
+
+        tvEpgNow       = miniPlayerContainer.findViewById(R.id.tvEpgNow)
+        tvEpgNowTime   = miniPlayerContainer.findViewById(R.id.tvEpgNowTime)
+        tvEpgNext1     = miniPlayerContainer.findViewById(R.id.tvEpgNext1)
+        tvEpgNext1Time = miniPlayerContainer.findViewById(R.id.tvEpgNext1Time)
+        tvEpgNext2     = miniPlayerContainer.findViewById(R.id.tvEpgNext2)
+        tvEpgNext2Time = miniPlayerContainer.findViewById(R.id.tvEpgNext2Time)
+        tvEpgNext3     = miniPlayerContainer.findViewById(R.id.tvEpgNext3)
+        tvEpgNext3Time = miniPlayerContainer.findViewById(R.id.tvEpgNext3Time)
+
+        btnMiniClose.setOnClickListener { fecharMiniPlayer() }
+
+        // Clique no vídeo: duplo clique expande, simples sem ação extra
+        miniPlayerFrame.setOnClickListener {
+            val now = System.currentTimeMillis()
+            if (now - lastClickTime < DOUBLE_CLICK_MS) {
+                expandirParaFullscreen()
+            }
+            lastClickTime = now
+        }
 
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         username = prefs.getString("username", "") ?: ""
@@ -89,7 +154,6 @@ class LiveTvActivity : AppCompatActivity() {
         rvCategories.isFocusable = true
         rvCategories.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
 
-        // ✅ Colunas adaptadas: 5 na TV, 4 no celular
         val colunas = if (isTvDevice()) 5 else 4
         rvChannels.layoutManager = GridLayoutManager(this, colunas)
         rvChannels.isFocusable = true
@@ -101,6 +165,153 @@ class LiveTvActivity : AppCompatActivity() {
         carregarCategorias()
     }
 
+    // ── Mini player: iniciar ─────────────────────────────────────────────────
+    @OptIn(UnstableApi::class)
+    private fun abrirMiniPlayer(canal: LiveStream) {
+        // Se clicou no mesmo canal já aberto, não reinicia
+        if (currentMiniChannel?.id == canal.id && miniPlayer != null) return
+
+        currentMiniChannel = canal
+        tvMiniChannelName.text = canal.name
+
+        // Reseta EPG
+        tvEpgNow.text = "Carregando..."
+        tvEpgNowTime.text = "Agora"
+        tvEpgNext1.text = ""; tvEpgNext1Time.text = ""
+        tvEpgNext2.text = ""; tvEpgNext2Time.text = ""
+        tvEpgNext3.text = ""; tvEpgNext3Time.text = ""
+
+        miniPlayerContainer.visibility = View.VISIBLE
+        miniLoading.visibility = View.VISIBLE
+
+        // Monta URL
+        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        val dns   = (prefs.getString("dns", "") ?: "").trimEnd('/')
+        val url   = "$dns/live/$username/$password/${canal.id}.ts"
+
+        // Libera player anterior
+        miniPlayer?.release()
+        miniPlayer = null
+
+        val dataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("IPTVSmartersPro")
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(10000)
+            .setReadTimeoutMs(12000)
+
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(1500, 4000, 800, 1500)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+
+        miniPlayer = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSourceFactory))
+            .setLoadControl(loadControl)
+            .build()
+
+        miniPlayerView.player = miniPlayer
+        miniPlayer!!.setMediaItem(MediaItem.fromUri(Uri.parse(url)))
+        miniPlayer!!.prepare()
+        miniPlayer!!.playWhenReady = true
+
+        miniPlayer!!.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                when (state) {
+                    Player.STATE_READY    -> miniLoading.visibility = View.GONE
+                    Player.STATE_BUFFERING -> miniLoading.visibility = View.VISIBLE
+                    else -> {}
+                }
+            }
+            override fun onPlayerError(error: PlaybackException) {
+                miniLoading.visibility = View.GONE
+                Toast.makeText(this@LiveTvActivity, "Erro ao carregar canal", Toast.LENGTH_SHORT).show()
+            }
+        })
+
+        // Carrega EPG com 4 programas
+        carregarEpgMini(canal)
+    }
+
+    private fun carregarEpgMini(canal: LiveStream) {
+        XtreamApi.service.getShortEpg(
+            user     = username,
+            pass     = password,
+            streamId = canal.id.toString(),
+            limit    = 4
+        ).enqueue(object : Callback<EpgWrapper> {
+            override fun onResponse(call: Call<EpgWrapper>, response: Response<EpgWrapper>) {
+                val epg = response.body()?.epg_listings ?: emptyList()
+
+                fun fmt(item: EpgResponseItem?): String {
+                    if (item == null) return ""
+                    val start = item.start?.take(16)?.replace("T", " ") ?: ""
+                    return if (start.length >= 16) start.substring(11, 16) else start
+                }
+
+                tvEpgNow.text     = decodeBase64(epg.getOrNull(0)?.title) ?: "Sem informação"
+                tvEpgNowTime.text = "Agora · ${fmt(epg.getOrNull(0))}"
+
+                tvEpgNext1.text     = decodeBase64(epg.getOrNull(1)?.title) ?: ""
+                tvEpgNext1Time.text = fmt(epg.getOrNull(1))
+
+                tvEpgNext2.text     = decodeBase64(epg.getOrNull(2)?.title) ?: ""
+                tvEpgNext2Time.text = fmt(epg.getOrNull(2))
+
+                tvEpgNext3.text     = decodeBase64(epg.getOrNull(3)?.title) ?: ""
+                tvEpgNext3Time.text = fmt(epg.getOrNull(3))
+            }
+            override fun onFailure(call: Call<EpgWrapper>, t: Throwable) {
+                tvEpgNow.text = "Sem programação"
+            }
+        })
+    }
+
+    private fun fecharMiniPlayer() {
+        miniPlayer?.stop()
+        miniPlayer?.release()
+        miniPlayer = null
+        miniPlayerView.player = null
+        currentMiniChannel = null
+        miniPlayerContainer.visibility = View.GONE
+    }
+
+    private fun expandirParaFullscreen() {
+        val canal = currentMiniChannel ?: return
+
+        // Para o mini player sem delay
+        miniPlayer?.stop()
+        miniPlayer?.release()
+        miniPlayer = null
+        miniPlayerView.player = null
+        miniPlayerContainer.visibility = View.GONE
+
+        // Abre o player fullscreen imediatamente
+        val intent = Intent(this, PlayerActivity::class.java)
+        intent.putExtra("stream_id",   canal.id)
+        intent.putExtra("stream_ext",  "ts")
+        intent.putExtra("stream_type", "live")
+        intent.putExtra("channel_name", canal.name)
+        intent.putExtra("icon",        canal.icon ?: "")
+        startActivity(intent)
+    }
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+    override fun onPause() {
+        super.onPause()
+        miniPlayer?.pause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (currentMiniChannel != null) miniPlayer?.play()
+    }
+
+    override fun onDestroy() {
+        fecharMiniPlayer()
+        super.onDestroy()
+    }
+
+    // ── Resto do código original ──────────────────────────────────────────────
     private fun preLoadChannelLogos(canais: List<LiveStream>) {
         CoroutineScope(Dispatchers.IO).launch {
             val limit = minOf(canais.size, 40)
@@ -110,7 +321,7 @@ class LiveTvActivity : AppCompatActivity() {
                     withContext(Dispatchers.Main) {
                         Glide.with(this@LiveTvActivity)
                             .load(url)
-                            .format(DecodeFormat.PREFER_ARGB_8888) // ✅ HD
+                            .format(DecodeFormat.PREFER_ARGB_8888)
                             .diskCacheStrategy(DiskCacheStrategy.ALL)
                             .priority(Priority.LOW)
                             .preload()
@@ -136,9 +347,15 @@ class LiveTvActivity : AppCompatActivity() {
                n.contains("hot") || n.contains("sexo")
     }
 
+    private fun decodeBase64(text: String?): String {
+        return try {
+            if (text.isNullOrEmpty()) ""
+            else String(Base64.decode(text, Base64.DEFAULT), Charset.forName("UTF-8"))
+        } catch (e: Exception) { text ?: "" }
+    }
+
     private fun carregarCategorias() {
         cachedCategories?.let { aplicarCategorias(it); return }
-
         progressBar.visibility = View.VISIBLE
 
         XtreamApi.service.getLiveCategories(username, password)
@@ -148,14 +365,14 @@ class LiveTvActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body() != null) {
                         try {
                             val rawJson = response.body()!!.string()
-                            val lista = mutableListOf<LiveCategory>()
-                            val gson = Gson()
+                            val lista   = mutableListOf<LiveCategory>()
+                            val gson    = Gson()
 
                             if (rawJson.trim().startsWith("[")) {
                                 val listType = object : TypeToken<List<LiveCategory>>() {}.type
                                 lista.addAll(gson.fromJson(rawJson, listType))
                             } else if (rawJson.trim().startsWith("{")) {
-                                val obj = JSONObject(rawJson)
+                                val obj  = JSONObject(rawJson)
                                 val keys = obj.keys()
                                 while (keys.hasNext()) {
                                     lista.add(gson.fromJson(obj.getJSONObject(keys.next()).toString(), LiveCategory::class.java))
@@ -186,7 +403,7 @@ class LiveTvActivity : AppCompatActivity() {
         if (categorias.isEmpty()) {
             Toast.makeText(this, "Nenhuma categoria disponível.", Toast.LENGTH_SHORT).show()
             rvCategories.adapter = CategoryAdapter(emptyList()) {}
-            rvChannels.adapter = ChannelAdapter(emptyList(), username, password) {}
+            rvChannels.adapter   = ChannelAdapter(emptyList(), username, password) {}
             return
         }
         categoryAdapter = CategoryAdapter(categorias) { carregarCanais(it) }
@@ -231,13 +448,9 @@ class LiveTvActivity : AppCompatActivity() {
 
     private fun aplicarCanais(categoria: LiveCategory, canais: List<LiveStream>) {
         tvCategoryTitle.text = categoria.name
+        // ✅ onClick agora abre o mini player — duplo clique expande
         channelAdapter = ChannelAdapter(canais, username, password) { canal ->
-            val intent = Intent(this, PlayerActivity::class.java)
-            intent.putExtra("stream_id", canal.id)
-            intent.putExtra("stream_ext", "ts")
-            intent.putExtra("stream_type", "live")
-            intent.putExtra("channel_name", canal.name)
-            startActivity(intent)
+            abrirMiniPlayer(canal)
         }
         rvChannels.adapter = channelAdapter
     }
@@ -251,8 +464,8 @@ class LiveTvActivity : AppCompatActivity() {
         private var selectedPos = 0
 
         inner class VH(v: View) : RecyclerView.ViewHolder(v) {
-            val tvName: TextView = v.findViewById(R.id.tvName)
-            val viewIndicator: View? = try { v.findViewById(R.id.viewIndicator) } catch (e: Exception) { null }
+            val tvName: TextView        = v.findViewById(R.id.tvName)
+            val viewIndicator: View?    = try { v.findViewById(R.id.viewIndicator) } catch (e: Exception) { null }
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
@@ -263,9 +476,8 @@ class LiveTvActivity : AppCompatActivity() {
             holder.tvName.text = item.name
             atualizarEstilo(holder, position == selectedPos, false)
 
-            holder.itemView.isFocusable = true
-            holder.itemView.isClickable = true
-            // ✅ FIX DUPLO CLIQUE: false no celular, true só na TV
+            holder.itemView.isFocusable            = true
+            holder.itemView.isClickable            = true
             holder.itemView.isFocusableInTouchMode = isTvDevice()
 
             holder.itemView.setOnFocusChangeListener { _, hasFocus ->
@@ -317,15 +529,13 @@ class LiveTvActivity : AppCompatActivity() {
         private val onClick: (LiveStream) -> Unit
     ) : RecyclerView.Adapter<ChannelAdapter.VH>() {
 
-        private val epgCache = mutableMapOf<Int, List<EpgResponseItem>>()
-
-        // ✅ Zoom adaptado: menor no celular, maior na TV
+        private val epgCache  = mutableMapOf<Int, List<EpgResponseItem>>()
         private val zoomFocus = if (isTvDevice()) 1.12f else 1.04f
 
         inner class VH(v: View) : RecyclerView.ViewHolder(v) {
-            val tvName: TextView = v.findViewById(R.id.tvName)
-            val tvNow: TextView = v.findViewById(R.id.tvNow)
-            val tvNext: TextView = v.findViewById(R.id.tvNext)
+            val tvName: TextView  = v.findViewById(R.id.tvName)
+            val tvNow: TextView   = v.findViewById(R.id.tvNow)
+            val tvNext: TextView  = v.findViewById(R.id.tvNext)
             val imgLogo: ImageView = v.findViewById(R.id.imgLogo)
         }
 
@@ -336,7 +546,6 @@ class LiveTvActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            // ✅ HD: logo em qualidade máxima com fade suave
             Glide.with(holder.itemView.context)
                 .load(item.icon)
                 .format(DecodeFormat.PREFER_ARGB_8888)
@@ -350,9 +559,8 @@ class LiveTvActivity : AppCompatActivity() {
 
             carregarEpg(holder, item)
 
-            holder.itemView.isFocusable = true
-            holder.itemView.isClickable = true
-            // ✅ FIX DUPLO CLIQUE: desativa focusableInTouchMode no celular
+            holder.itemView.isFocusable            = true
+            holder.itemView.isClickable            = true
             holder.itemView.isFocusableInTouchMode = isTvDevice()
 
             holder.itemView.setOnFocusChangeListener { view, hasFocus ->
@@ -383,10 +591,10 @@ class LiveTvActivity : AppCompatActivity() {
             epgCache[canal.id]?.let { mostrarEpg(holder, it); return }
 
             XtreamApi.service.getShortEpg(
-                user = username,
-                pass = password,
+                user     = username,
+                pass     = password,
                 streamId = canal.id.toString(),
-                limit = 2
+                limit    = 2
             ).enqueue(object : Callback<EpgWrapper> {
                 override fun onResponse(call: Call<EpgWrapper>, response: Response<EpgWrapper>) {
                     if (response.isSuccessful && response.body()?.epg_listings != null) {
@@ -394,12 +602,12 @@ class LiveTvActivity : AppCompatActivity() {
                         epgCache[canal.id] = epg
                         mostrarEpg(holder, epg)
                     } else {
-                        holder.tvNow.text = ""
+                        holder.tvNow.text  = ""
                         holder.tvNext.text = ""
                     }
                 }
                 override fun onFailure(call: Call<EpgWrapper>, t: Throwable) {
-                    holder.tvNow.text = ""
+                    holder.tvNow.text  = ""
                     holder.tvNext.text = ""
                 }
             })
@@ -407,10 +615,10 @@ class LiveTvActivity : AppCompatActivity() {
 
         private fun mostrarEpg(holder: VH, epg: List<EpgResponseItem>) {
             if (epg.isNotEmpty()) {
-                holder.tvNow.text = decodeBase64(epg[0].title)
+                holder.tvNow.text  = decodeBase64(epg[0].title)
                 holder.tvNext.text = if (epg.size > 1) decodeBase64(epg[1].title) else ""
             } else {
-                holder.tvNow.text = ""
+                holder.tvNow.text  = ""
                 holder.tvNext.text = ""
             }
         }
@@ -419,7 +627,14 @@ class LiveTvActivity : AppCompatActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_BACK) { finish(); return true }
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (miniPlayerContainer.visibility == View.VISIBLE) {
+                fecharMiniPlayer()
+                return true
+            }
+            finish()
+            return true
+        }
         return super.onKeyDown(keyCode, event)
     }
 }
