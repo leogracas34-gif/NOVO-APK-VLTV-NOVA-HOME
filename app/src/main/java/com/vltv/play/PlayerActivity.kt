@@ -77,7 +77,6 @@ class PlayerActivity : AppCompatActivity() {
 
     private var episodeList = ArrayList<Int>()
 
-    // ✅ CORRIGIDO: controla se está em PiP ativamente
     private var isInPiP = false
 
     private val serverBackupList = listOf(
@@ -254,14 +253,12 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onUserLeaveHint() {
-        // ✅ CORRIGIDO: só entra em PiP se o player estiver tocando
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && player?.isPlaying == true) {
             val params = PictureInPictureParams.Builder()
                 .setAspectRatio(Rational(16, 9))
                 .build()
             enterPictureInPictureMode(params)
         } else {
-            // Se não estiver tocando, para completamente ao sair
             releasePlayerCompletely()
         }
         super.onUserLeaveHint()
@@ -279,34 +276,28 @@ class PlayerActivity : AppCompatActivity() {
         } else {
             playerView.useController = true
             topBar.visibility = if (playerView.isControllerFullyVisible) View.VISIBLE else View.GONE
-
-            // ✅ CORRIGIDO: saiu do PiP sem fechar o app — para o áudio
             if (!isInPictureInPictureMode && !isFinishing) {
                 player?.pause()
             }
         }
     }
 
-    // ✅ CORRIGIDO: onPause para o áudio sempre que sair da tela
     override fun onPause() {
         super.onPause()
         val p = player ?: return
 
-        // Salva posição
         if (streamType == "movie") {
             saveMovieResume(streamId, p.currentPosition, p.duration)
         } else if (streamType == "series") {
             saveSeriesResume(streamId, p.currentPosition, p.duration)
         }
 
-        // Para o áudio se não estiver em PiP
         if (!isInPiP) {
             p.playWhenReady = false
             p.pause()
         }
     }
 
-    // ✅ CORRIGIDO: onResume retoma o player ao voltar para a tela
     override fun onResume() {
         super.onResume()
         if (!isInPiP && player != null) {
@@ -314,7 +305,6 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    // ✅ CORRIGIDO: onStop libera o player completamente ao sair
     override fun onStop() {
         super.onStop()
         if (!isInPiP) {
@@ -458,7 +448,6 @@ class PlayerActivity : AppCompatActivity() {
                             Player.STATE_BUFFERING -> loading.visibility = View.VISIBLE
                         }
                     }
-
                     override fun onPlayerError(error: PlaybackException) {
                         Toast.makeText(this@PlayerActivity, "Erro ao reproduzir arquivo: ${error.message}", Toast.LENGTH_LONG).show()
                         Log.e("PLAYER_OFFLINE", "Erro: ${error.message}")
@@ -518,12 +507,7 @@ class PlayerActivity : AppCompatActivity() {
         val playRebufferMs = 2000
 
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
-            .setBufferDurationsMs(
-                minBufferMs,
-                maxBufferMs,
-                playBufferMs,
-                playRebufferMs
-            )
+            .setBufferDurationsMs(minBufferMs, maxBufferMs, playBufferMs, playRebufferMs)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
@@ -560,18 +544,14 @@ class PlayerActivity : AppCompatActivity() {
                 when (state) {
                     Player.STATE_READY -> {
                         loading.visibility = View.GONE
-
                         if (streamType == "series" && nextStreamId != 0) {
                             handler.removeCallbacks(nextChecker)
                             handler.post(nextChecker)
                         }
                     }
-
                     Player.STATE_BUFFERING -> loading.visibility = View.VISIBLE
-
                     Player.STATE_ENDED -> {
                         nextEpisodeContainer.visibility = View.GONE
-
                         if (streamType == "movie") {
                             clearMovieResume(streamId)
                         } else if (streamType == "series") {
@@ -649,7 +629,8 @@ class PlayerActivity : AppCompatActivity() {
     private fun saveMovieResume(id: Int, positionMs: Long, durationMs: Long) {
         if (durationMs <= 0L) return
         val percent = positionMs.toDouble() / durationMs.toDouble()
-        if (positionMs < 30_000L || percent > 0.95) {
+        // ✅ CORRIGIDO: era 30_000L — agora salva a partir de 5 segundos
+        if (positionMs < 5_000L || percent > 0.95) {
             clearMovieResume(id)
             return
         }
@@ -666,14 +647,14 @@ class PlayerActivity : AppCompatActivity() {
             try {
                 database.streamDao().saveWatchHistory(
                     WatchHistoryEntity(
-                        stream_id = id,
+                        stream_id    = id,
                         profile_name = currentProfile,
-                        name = tvChannelName.text.toString(),
-                        icon = intent.getStringExtra("icon") ?: "",
+                        name         = tvChannelName.text.toString(),
+                        icon         = intent.getStringExtra("icon") ?: "",
                         last_position = positionMs,
-                        duration = durationMs,
-                        is_series = false,
-                        timestamp = System.currentTimeMillis()
+                        duration     = durationMs,
+                        is_series    = false,
+                        timestamp    = System.currentTimeMillis()
                     )
                 )
             } catch (e: Exception) { }
@@ -693,7 +674,8 @@ class PlayerActivity : AppCompatActivity() {
     private fun saveSeriesResume(id: Int, positionMs: Long, durationMs: Long) {
         if (durationMs <= 0L) return
         val percent = positionMs.toDouble() / durationMs.toDouble()
-        if (positionMs < 30_000L || percent > 0.95) {
+        // ✅ CORRIGIDO: era 30_000L — agora salva a partir de 5 segundos
+        if (positionMs < 5_000L || percent > 0.95) {
             clearSeriesResume(id)
             return
         }
@@ -710,14 +692,14 @@ class PlayerActivity : AppCompatActivity() {
             try {
                 database.streamDao().saveWatchHistory(
                     WatchHistoryEntity(
-                        stream_id = id,
+                        stream_id    = id,
                         profile_name = currentProfile,
-                        name = tvChannelName.text.toString(),
-                        icon = intent.getStringExtra("icon") ?: "",
+                        name         = tvChannelName.text.toString(),
+                        icon         = intent.getStringExtra("icon") ?: "",
                         last_position = positionMs,
-                        duration = durationMs,
-                        is_series = true,
-                        timestamp = System.currentTimeMillis()
+                        duration     = durationMs,
+                        is_series    = true,
+                        timestamp    = System.currentTimeMillis()
                     )
                 )
             } catch (e: Exception) { }
@@ -752,12 +734,12 @@ class PlayerActivity : AppCompatActivity() {
 
         val db = FirebaseFirestore.getInstance()
         val data = hashMapOf(
-            "id" to id.toString(),
-            "name" to tvChannelName.text.toString(),
+            "id"         to id.toString(),
+            "name"       to tvChannelName.text.toString(),
             "streamIcon" to (intent.getStringExtra("icon") ?: ""),
             "positionMs" to positionMs,
             "durationMs" to durationMs,
-            "timestamp" to com.google.firebase.Timestamp.now()
+            "timestamp"  to com.google.firebase.Timestamp.now()
         )
 
         db.collection("users")
@@ -808,7 +790,6 @@ class PlayerActivity : AppCompatActivity() {
                 val fim = epg.stop ?: epg.end.orEmpty()
                 tvNowPlaying.text = if (inicio.isNotBlank()) "$titulo ($inicio - $fim)" else titulo
             }
-
             override fun onFailure(call: Call<EpgWrapper>, t: Throwable) {
                 tvNowPlaying.text = "Falha ao carregar programação"
             }
@@ -827,7 +808,6 @@ class PlayerActivity : AppCompatActivity() {
                         btnPlayNextEpisode.performClick()
                         return true
                     }
-
                     if (playerView.isControllerFullyVisible) {
                         if (p.isPlaying) p.pause() else p.play()
                     } else {
@@ -835,20 +815,16 @@ class PlayerActivity : AppCompatActivity() {
                     }
                     return true
                 }
-
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
                     if (nextEpisodeContainer.visibility == View.VISIBLE) {
                         btnPlayNextEpisode.requestFocus()
                         return true
                     }
-                    if (!playerView.isControllerFullyVisible) {
-                        playerView.showController()
-                    }
+                    if (!playerView.isControllerFullyVisible) playerView.showController()
                     val seekBar = playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress)
                     seekBar?.requestFocus()
                     return true
                 }
-
                 KeyEvent.KEYCODE_DPAD_RIGHT -> {
                     if (streamType != "live") {
                         p.seekTo((p.currentPosition + 10_000L).coerceAtMost(p.duration))
@@ -856,7 +832,6 @@ class PlayerActivity : AppCompatActivity() {
                         return true
                     }
                 }
-
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (streamType != "live") {
                         p.seekTo((p.currentPosition - 10_000L).coerceAtLeast(0L))
