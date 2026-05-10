@@ -211,7 +211,6 @@ class DetailsActivity : AppCompatActivity() {
         btnDownloadArea?.visibility   = View.GONE
         btnDownloadAction?.visibility = View.GONE
 
-        // Garante estado inicial correto
         layoutProgress?.visibility    = View.GONE
         btnRestartAction?.visibility  = View.GONE
         btnResume.visibility          = View.GONE
@@ -270,8 +269,7 @@ class DetailsActivity : AppCompatActivity() {
         restaurarEstadoDownload()
     }
 
-    // ── VERIFICAR RESUME ────────────────────────────────────────────────────────
-    // ✅ CORRIGIDO: threshold reduzido para 5s, barra e botão aparecem corretamente
+    // ── VERIFICAR RESUME (Lógica de Continuar > 30s) ──────────────────────────
     private fun verificarResume() {
         val prefs    = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         val keyPos   = "${currentProfile}_movie_resume_${streamId}_pos"
@@ -279,14 +277,15 @@ class DetailsActivity : AppCompatActivity() {
         val pos      = prefs.getLong(keyPos, 0L)
         val totalDur = prefs.getLong(keyDur, 0L)
 
-        if (pos > 5_000L && totalDur > 0) {
-            // Muda o botão principal para CONTINUAR
+        // Implementação: 30 segundos = 30.000 milissegundos
+        if (pos >= 30_000L && totalDur > 0) {
+            // Se assistiu 30s ou mais, muda o botão principal para CONTINUAR
             btnPlay.text = "▶  CONTINUAR"
 
-            // Mostra botão de reiniciar separado
+            // Mostra o botão de reiniciar (Restart) ao lado ou abaixo conforme o XML
             btnRestartAction?.visibility = View.VISIBLE
 
-            // Mostra barra de progresso
+            // Exibe a barra de progresso
             layoutProgress?.visibility = View.VISIBLE
 
             val progressPercent = ((pos.toFloat() / totalDur.toFloat()) * 100).toInt()
@@ -297,7 +296,6 @@ class DetailsActivity : AppCompatActivity() {
             val minutes  = TimeUnit.MILLISECONDS.toMinutes(restMs) % 60
             val assistido = TimeUnit.MILLISECONDS.toMinutes(pos)
 
-            // ✅ Mostra: "42min assistido   |   1h18min restando"
             tvTimeRemaining?.text = if (hours > 0) {
                 "${assistido}min assistido  •  Resta ${hours}h${minutes}min"
             } else {
@@ -305,7 +303,7 @@ class DetailsActivity : AppCompatActivity() {
             }
 
         } else {
-            // Sem progresso salvo — estado padrão
+            // Se assistiu menos de 30s ou não tem progresso, volta para o estado inicial
             btnPlay.text                 = "▶  ASSISTIR"
             btnRestartAction?.visibility = View.GONE
             layoutProgress?.visibility   = View.GONE
