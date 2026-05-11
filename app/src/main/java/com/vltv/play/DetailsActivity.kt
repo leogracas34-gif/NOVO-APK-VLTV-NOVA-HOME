@@ -56,6 +56,7 @@ class DetailsActivity : AppCompatActivity() {
 
     private var serverYoutubeTrailer: String? = null
     private var currentProfile: String = "Padrao"
+    private var savedPosition: Long = 0L
 
     private lateinit var imgPoster: ImageView
     private lateinit var tvTitle: TextView
@@ -210,7 +211,6 @@ class DetailsActivity : AppCompatActivity() {
         btnDownloadArea?.visibility   = View.GONE
         btnDownloadAction?.visibility = View.GONE
 
-        // ✅ Estado inicial — sempre escondido até verificarResume() decidir
         layoutProgress?.visibility    = View.GONE
         btnRestartAction?.visibility  = View.GONE
         btnResume.visibility          = View.GONE
@@ -269,47 +269,41 @@ class DetailsActivity : AppCompatActivity() {
         restaurarEstadoDownload()
     }
 
-    // ✅ CORRIGIDO: threshold 30s, mostra barra + botão reiniciar + muda texto do btnPlay
     private fun verificarResume() {
-        val prefs    = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        val keyPos   = "${currentProfile}_movie_resume_${streamId}_pos"
-        val keyDur   = "${currentProfile}_movie_resume_${streamId}_dur"
-        val pos      = prefs.getLong(keyPos, 0L)
-        val totalDur = prefs.getLong(keyDur, 0L)
+        CoroutineScope(Dispatchers.IO).launch {
+            val db = AppDatabase.getDatabase(applicationContext).streamDao()
+            val progresso = db.getResumeProgress(streamId, currentProfile)
 
-        // ✅ Threshold: 30 segundos (30_000ms) — coerente com o PlayerActivity
-        if (pos >= 30_000L && totalDur > 0) {
+            withContext(Dispatchers.Main) {
+                if (progresso != null && progresso.position >= 30_000L && progresso.duration > 0) {
+                    savedPosition = progresso.position
+                    btnPlay.text = "▶  CONTINUAR"
+                    btnRestartAction?.visibility = View.VISIBLE
+                    layoutProgress?.visibility = View.VISIBLE
 
-            // Botão principal vira CONTINUAR
-            btnPlay.text = "▶  CONTINUAR"
+                    val pos = progresso.position
+                    val totalDur = progresso.duration
+                    val progressPercent = ((pos.toFloat() / totalDur.toFloat()) * 100).toInt()
+                    progressBarMovie?.progress = progressPercent
 
-            // Botão reiniciar abaixo do continuar
-            btnRestartAction?.visibility = View.VISIBLE
+                    val assistidoMin = TimeUnit.MILLISECONDS.toMinutes(pos)
+                    val restMs = totalDur - pos
+                    val horasRest = TimeUnit.MILLISECONDS.toHours(restMs)
+                    val minRest = TimeUnit.MILLISECONDS.toMinutes(restMs) % 60
 
-            // Barra de progresso
-            layoutProgress?.visibility = View.VISIBLE
-
-            val progressPercent = ((pos.toFloat() / totalDur.toFloat()) * 100).toInt()
-            progressBarMovie?.progress = progressPercent
-
-            // ✅ Tempo assistido e tempo restante
-            val assistidoMin = TimeUnit.MILLISECONDS.toMinutes(pos)
-            val restMs   = totalDur - pos
-            val horasRest = TimeUnit.MILLISECONDS.toHours(restMs)
-            val minRest   = TimeUnit.MILLISECONDS.toMinutes(restMs) % 60
-
-            tvTimeRemaining?.text = if (horasRest > 0) {
-                "${assistidoMin}min assistido  •  Faltam ${horasRest}h${minRest}min"
-            } else {
-                "${assistidoMin}min assistido  •  Faltam ${minRest}min"
+                    tvTimeRemaining?.text = if (horasRest > 0) {
+                        "${assistidoMin}min assistido  •  Faltam ${horasRest}h${minRest}min"
+                    } else {
+                        "${assistidoMin}min assistido  •  Faltam ${minRest}min"
+                    }
+                } else {
+                    savedPosition = 0L
+                    btnPlay.text = "▶  ASSISTIR"
+                    btnRestartAction?.visibility = View.GONE
+                    layoutProgress?.visibility = View.GONE
+                    btnResume.visibility = View.GONE
+                }
             }
-
-        } else {
-            // Sem progresso suficiente — estado padrão
-            btnPlay.text                 = "▶  ASSISTIR"
-            btnRestartAction?.visibility = View.GONE
-            layoutProgress?.visibility   = View.GONE
-            btnResume.visibility         = View.GONE
         }
     }
 
@@ -556,26 +550,17 @@ class DetailsActivity : AppCompatActivity() {
         btnFavorite.setOnClickListener        { toggleFavorite() }
         btnFavoriteLayout?.setOnClickListener { toggleFavorite() }
 
-        // ✅ btnPlay: se há progresso salvo → continua; senão → começa do início
         btnPlay.setOnClickListener {
-            val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-            val pos = prefs.getLong("${currentProfile}_movie_resume_${streamId}_pos", 0L)
-            if (pos >= 30_000L) {
-                abrirPlayer(usarResume = true)
-            } else {
-                abrirPlayer(usarResume = false)
-            }
+            abrirPlayer(savedPosition)
         }
 
-        // ✅ btnResume: sempre continua (para compatibilidade futura)
-        btnResume.setOnClickListener { abrirPlayer(usarResume = true) }
+        btnResume.setOnClickListener { abrirPlayer(savedPosition) }
 
-        // ✅ btnRestartAction: reinicia desde o início com confirmação
         btnRestartAction?.setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("Reiniciar")
                 .setMessage("Deseja assistir desde o início?")
-                .setPositiveButton("Sim") { _, _ -> abrirPlayer(usarResume = false) }
+                .setPositiveButton("Sim") { _, _ -> abrirPlayer(0L) }
                 .setNegativeButton("Não", null)
                 .show()
         }
@@ -634,15 +619,7 @@ class DetailsActivity : AppCompatActivity() {
         saveFavMovies(this, favs)
     }
 
-    // ✅ usarResume = true → passa a posição salva; false → passa 0 (começa do início)
-    private fun abrirPlayer(usarResume: Boolean) {
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        val posicao = if (usarResume) {
-            prefs.getLong("${currentProfile}_movie_resume_${streamId}_pos", 0L)
-        } else {
-            0L
-        }
-
+    private fun abrirPlayer(posicao: Long) {
         val intent = Intent(this, PlayerActivity::class.java).apply {
             putExtra("stream_id",        streamId)
             putExtra("stream_type",      if (isSeries) "series" else "movie")
@@ -709,7 +686,6 @@ class DetailsActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         restaurarEstadoDownload()
-        // ✅ Sempre relê o progresso ao voltar do player
         verificarResume()
     }
 
@@ -719,7 +695,6 @@ class DetailsActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    // ── Adapters ──────────────────────────────────────────────────────────────
     inner class EpisodesAdapter(private val onEpisodeClick: (EpisodeData) -> Unit) :
         ListAdapter<EpisodeData, EpisodesAdapter.ViewHolder>(DiffCallback) {
         override fun onCreateViewHolder(p: ViewGroup, t: Int) =
