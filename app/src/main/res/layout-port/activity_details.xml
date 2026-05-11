@@ -109,10 +109,7 @@
                 android:textColor="#88FFFFFF"
                 android:textSize="11sp"/>
 
-            <!-- ══════════════════════════════════════════════════════════
-                 BARRA DE PROGRESSO + REINICIAR
-                 Aparece quando há posição salva
-                 ══════════════════════════════════════════════════════════ -->
+            <!-- BARRA DE PROGRESSO + REINICIAR -->
             <LinearLayout
                 android:id="@+id/layoutProgress"
                 android:layout_width="match_parent"
@@ -147,7 +144,6 @@
                         android:textSize="10sp"/>
                 </LinearLayout>
 
-                <!-- Botão "Assistir do início" -->
                 <LinearLayout
                     android:id="@+id/btnRestartAction"
                     android:layout_width="wrap_content"
@@ -156,7 +152,7 @@
                     android:gravity="center"
                     android:layout_marginTop="6dp"
                     android:layout_gravity="center_horizontal"
-                    android:padding="6dp"
+                    android:padding="8dp"
                     android:clickable="true"
                     android:focusable="true"
                     android:background="?attr/selectableItemBackground"
@@ -178,39 +174,37 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- ══════════════════════════════════════════════════════════
-                 BOTÃO ASSISTIR (padrão) — fica visível sempre
-                 ══════════════════════════════════════════════════════════ -->
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/btnPlay"
+            <!-- ÁREA DOS BOTÕES PRINCIPAIS (FrameLayout para sobreposição perfeita) -->
+            <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
                 android:layout_marginHorizontal="18dp"
-                android:layout_marginTop="14dp"
-                android:background="@drawable/bg_btn_white"
-                android:text="▶  ASSISTIR"
-                android:textColor="#000000"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.04"/>
+                android:layout_marginTop="14dp">
 
-            <!-- ══════════════════════════════════════════════════════════
-                 BOTÃO CONTINUAR — aparece por cima do ASSISTIR via
-                 visibilidade, mas está no mesmo espaço
-                 ══════════════════════════════════════════════════════════ -->
-            <androidx.appcompat.widget.AppCompatButton
-                android:id="@+id/btnResume"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginHorizontal="18dp"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_btn_white"
-                android:text="▶  CONTINUAR"
-                android:textColor="#000000"
-                android:textSize="15sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.04"
-                android:visibility="gone"/>
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnPlay"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_btn_white"
+                    android:text="▶  ASSISTIR"
+                    android:textColor="#000000"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.04"
+                    android:visibility="visible"/>
+
+                <androidx.appcompat.widget.AppCompatButton
+                    android:id="@+id/btnResume"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:background="@drawable/bg_btn_white"
+                    android:text="▶  CONTINUAR"
+                    android:textColor="#000000"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.04"
+                    android:visibility="gone"/>
+            </FrameLayout>
 
             <!-- Ações secundárias -->
             <LinearLayout
@@ -228,6 +222,7 @@
                     android:layout_weight="1"
                     android:gravity="center"
                     android:orientation="vertical"
+                    android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:focusable="true">
                     <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_details_trailer"/>
@@ -241,6 +236,7 @@
                     android:layout_weight="1"
                     android:gravity="center"
                     android:orientation="vertical"
+                    android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:focusable="true">
                     <ImageButton
@@ -249,7 +245,8 @@
                         android:layout_height="22dp"
                         android:background="@android:color/transparent"
                         android:src="@drawable/ic_details_add"
-                        app:tint="#CCFFFFFF"/>
+                        app:tint="#CCFFFFFF"
+                        android:clickable="false"/>
                     <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="MINHA LISTA" android:textColor="#AAFFFFFF" android:textSize="9sp" android:layout_marginTop="4dp" android:letterSpacing="0.05"/>
                 </LinearLayout>
 
@@ -260,6 +257,7 @@
                     android:layout_weight="1"
                     android:gravity="center"
                     android:orientation="vertical"
+                    android:background="?attr/selectableItemBackground"
                     android:clickable="true"
                     android:focusable="true">
                     <ImageView android:id="@+id/imgDownloadState" android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_details_download"/>
