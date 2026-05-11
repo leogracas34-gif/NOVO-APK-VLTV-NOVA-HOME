@@ -630,7 +630,7 @@ class PlayerActivity : AppCompatActivity() {
         if (durationMs <= 0L) return
         val percent = positionMs.toDouble() / durationMs.toDouble()
         // ✅ CORRIGIDO: era 30_000L — agora salva a partir de 5 segundos
-        if (positionMs < 5_000L || percent > 0.95) {
+        if (positionMs < 30_000L || percent > 0.95) {
             clearMovieResume(id)
             return
         }
@@ -675,7 +675,7 @@ class PlayerActivity : AppCompatActivity() {
         if (durationMs <= 0L) return
         val percent = positionMs.toDouble() / durationMs.toDouble()
         // ✅ CORRIGIDO: era 30_000L — agora salva a partir de 5 segundos
-        if (positionMs < 5_000L || percent > 0.95) {
+        if (positionMs < 30_000L || percent > 0.95) {
             clearSeriesResume(id)
             return
         }
