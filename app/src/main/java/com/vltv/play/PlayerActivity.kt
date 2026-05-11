@@ -99,6 +99,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private val SHOW_NEXT_EPISODE_SECONDS = 80L
 
+    // Lógica para verificar próximo episódio
     private val nextChecker = object : Runnable {
         override fun run() {
             val p = player ?: return
@@ -133,6 +134,28 @@ class PlayerActivity : AppCompatActivity() {
             } else {
                 nextEpisodeContainer.visibility = View.GONE
             }
+        }
+    }
+
+    // NOVA LÓGICA: Rastreamento de progresso em tempo real (30 segundos para virar "Continuar")
+    private val progressTracker = object : Runnable {
+        override fun run() {
+            val p = player ?: return
+            if (p.isPlaying && (streamType == "movie" || streamType == "series")) {
+                val pos = p.currentPosition
+                val dur = p.duration
+
+                // Se assistiu mais de 30 segundos, salva automaticamente para habilitar o "Continuar"
+                if (pos >= 30_000L && dur > 0) {
+                    if (streamType == "movie") {
+                        saveMovieResume(streamId, pos, dur)
+                    } else {
+                        saveSeriesResume(streamId, pos, dur)
+                    }
+                }
+            }
+            // Verifica e salva a cada 10 segundos
+            handler.postDelayed(this, 10000L)
         }
     }
 
@@ -250,6 +273,12 @@ class PlayerActivity : AppCompatActivity() {
             handler.removeCallbacks(nextChecker)
             handler.post(nextChecker)
         }
+
+        // Inicia o rastreador de progresso para filmes e séries
+        if (streamType == "movie" || streamType == "series") {
+            handler.removeCallbacks(progressTracker)
+            handler.post(progressTracker)
+        }
     }
 
     override fun onUserLeaveHint() {
@@ -314,6 +343,7 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         handler.removeCallbacks(nextChecker)
+        handler.removeCallbacks(progressTracker)
         val p = player
         if (p != null) {
             if (streamType == "movie") {
@@ -343,6 +373,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun releasePlayerCompletely() {
         handler.removeCallbacks(nextChecker)
+        handler.removeCallbacks(progressTracker)
         nextEpisodeContainer.visibility = View.GONE
 
         player?.let { exoPlayer ->
@@ -629,11 +660,16 @@ class PlayerActivity : AppCompatActivity() {
     private fun saveMovieResume(id: Int, positionMs: Long, durationMs: Long) {
         if (durationMs <= 0L) return
         val percent = positionMs.toDouble() / durationMs.toDouble()
-        // ✅ CORRIGIDO: era 30_000L — agora salva a partir de 5 segundos
-        if (positionMs < 30_000L || percent > 0.95) {
+
+        // Se assistiu quase tudo (95%), considera finalizado e limpa o progresso
+        if (percent > 0.95) {
             clearMovieResume(id)
             return
         }
+        
+        // Salva apenas se assistiu mais de 30 segundos
+        if (positionMs < 30_000L) return
+
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         prefs.edit()
             .putLong("${getMovieKey(id)}_pos", positionMs)
@@ -674,11 +710,14 @@ class PlayerActivity : AppCompatActivity() {
     private fun saveSeriesResume(id: Int, positionMs: Long, durationMs: Long) {
         if (durationMs <= 0L) return
         val percent = positionMs.toDouble() / durationMs.toDouble()
-        // ✅ CORRIGIDO: era 30_000L — agora salva a partir de 5 segundos
-        if (positionMs < 30_000L || percent > 0.95) {
+
+        if (percent > 0.95) {
             clearSeriesResume(id)
             return
         }
+
+        if (positionMs < 30_000L) return
+
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         prefs.edit()
             .putLong("${getSeriesKey(id)}_pos", positionMs)
