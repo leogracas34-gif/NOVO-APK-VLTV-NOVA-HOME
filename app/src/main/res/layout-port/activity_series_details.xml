@@ -137,7 +137,8 @@
                                 android:layout_height="4dp"
                                 android:layout_weight="1"
                                 android:progressBackgroundTint="#333333"
-                                android:progress="0"/>
+                                android:progressTint="#FF0000"  android:progress="0"
+                                android:indeterminate="false"/>
 
                             <TextView
                                 android:id="@+id/tvTimeRemaining"
