@@ -137,7 +137,7 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    // NOVA LÓGICA: Rastreamento de progresso em tempo real (30 segundos para virar "Continuar")
+    // NOVA LÓGICA: Rastreamento de progresso em tempo real
     private val progressTracker = object : Runnable {
         override fun run() {
             val p = player ?: return
@@ -145,7 +145,6 @@ class PlayerActivity : AppCompatActivity() {
                 val pos = p.currentPosition
                 val dur = p.duration
 
-                // Se assistiu mais de 30 segundos, salva automaticamente para habilitar o "Continuar"
                 if (pos >= 30_000L && dur > 0) {
                     if (streamType == "movie") {
                         saveMovieResume(streamId, pos, dur)
@@ -154,7 +153,6 @@ class PlayerActivity : AppCompatActivity() {
                     }
                 }
             }
-            // Verifica e salva a cada 10 segundos
             handler.postDelayed(this, 10000L)
         }
     }
@@ -274,7 +272,6 @@ class PlayerActivity : AppCompatActivity() {
             handler.post(nextChecker)
         }
 
-        // Inicia o rastreador de progresso para filmes e séries
         if (streamType == "movie" || streamType == "series") {
             handler.removeCallbacks(progressTracker)
             handler.post(progressTracker)
@@ -655,19 +652,19 @@ class PlayerActivity : AppCompatActivity() {
         return if (ext.isBlank()) "$base/$streamType/$user/$pass/$id" else "$base/$streamType/$user/$pass/$id.$ext"
     }
 
+    // --- LÓGICA DE PERSISTÊNCIA INTEGRADA DO PROJETO ANTIGO ---
+
     private fun getMovieKey(id: Int) = "${currentProfile}_movie_resume_$id"
 
     private fun saveMovieResume(id: Int, positionMs: Long, durationMs: Long) {
         if (durationMs <= 0L) return
         val percent = positionMs.toDouble() / durationMs.toDouble()
 
-        // Se assistiu quase tudo (95%), considera finalizado e limpa o progresso
         if (percent > 0.95) {
             clearMovieResume(id)
             return
         }
         
-        // Salva apenas se assistiu mais de 30 segundos
         if (positionMs < 30_000L) return
 
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
