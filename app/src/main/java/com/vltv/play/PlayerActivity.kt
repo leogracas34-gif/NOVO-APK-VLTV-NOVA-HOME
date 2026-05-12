@@ -707,51 +707,64 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun getSeriesKey(episodeStreamId: Int) = "${currentProfile}_series_resume_$episodeStreamId"
 
-    private fun saveSeriesResume(id: Int, positionMs: Long, durationMs: Long) {
-        if (durationMs <= 0L) return
-        val percent = positionMs.toDouble() / durationMs.toDouble()
+private fun saveSeriesResume(id: Int, positionMs: Long, durationMs: Long) {
+    if (durationMs <= 0L) return
+    val percent = positionMs.toDouble() / durationMs.toDouble()
 
-        if (percent > 0.95) {
-            clearSeriesResume(id)
-            return
-        }
+    // Se assistiu mais de 95%, limpamos para não oferecer "Continuar" em algo que já acabou
+    if (percent > 0.95) {
+        clearSeriesResume(id)
+        return
+    }
 
-        if (positionMs < 30_000L) return
+    // Mantendo sua regra de 30 segundos, mas garantindo o salvamento imediato (commit)
+    if (positionMs < 30_000L) return
 
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        prefs.edit()
-            .putLong("${getSeriesKey(id)}_pos", positionMs)
-            .putLong("${getSeriesKey(id)}_dur", durationMs)
-            .apply()
+    val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+    prefs.edit().apply {
+        putLong("${getSeriesKey(id)}_pos", positionMs)
+        putLong("${getSeriesKey(id)}_dur", durationMs)
+        // Linha crucial: salva qual foi o último ID de episódio mexido nesta série
+        putInt("${currentProfile}_series_last_played_id", id) 
+        commit() // Usamos commit() aqui para garantir que o dado grave antes da troca de tela
+    }
 
-        salvarNoFirebase(id, positionMs, durationMs)
-        salvarNoHistoricoLocal(id.toString())
+    // Sincronização externa
+    salvarNoFirebase(id, positionMs, durationMs)
+    salvarNoHistoricoLocal(id.toString())
 
-        lifecycleScope.launch(Dispatchers.IO) {
-            try {
-                database.streamDao().saveWatchHistory(
-                    WatchHistoryEntity(
-                        stream_id    = id,
-                        profile_name = currentProfile,
-                        name         = tvChannelName.text.toString(),
-                        icon         = intent.getStringExtra("icon") ?: "",
-                        last_position = positionMs,
-                        duration     = durationMs,
-                        is_series    = true,
-                        timestamp    = System.currentTimeMillis()
-                    )
+    lifecycleScope.launch(Dispatchers.IO) {
+        try {
+            database.streamDao().saveWatchHistory(
+                WatchHistoryEntity(
+                    stream_id    = id,
+                    profile_name = currentProfile,
+                    name         = tvChannelName.text.toString(),
+                    icon         = intent.getStringExtra("icon") ?: "",
+                    last_position = positionMs,
+                    duration     = durationMs,
+                    is_series    = true,
+                    timestamp    = System.currentTimeMillis()
                 )
-            } catch (e: Exception) { }
+            )
+        } catch (e: Exception) {
+            Log.e("DATABASE_ERROR", "Erro ao salvar histórico: ${e.message}")
         }
     }
+}
 
-    private fun clearSeriesResume(id: Int) {
-        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        prefs.edit()
-            .remove("${getSeriesKey(id)}_pos")
-            .remove("${getSeriesKey(id)}_dur")
-            .apply()
+private fun clearSeriesResume(id: Int) {
+    val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+    prefs.edit().apply {
+        remove("${getSeriesKey(id)}_pos")
+        remove("${getSeriesKey(id)}_dur")
+        // Remove também a marcação de último jogado se ele for o ID atual
+        if (prefs.getInt("${currentProfile}_series_last_played_id", 0) == id) {
+            remove("${currentProfile}_series_last_played_id")
+        }
+        apply()
     }
+}
 
     private fun salvarNoHistoricoLocal(id: String) {
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
