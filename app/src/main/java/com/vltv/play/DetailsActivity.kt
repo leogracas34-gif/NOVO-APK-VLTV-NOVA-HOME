@@ -269,40 +269,40 @@ class DetailsActivity : AppCompatActivity() {
     }
 
         private fun verificarResume() {
-        val prefs    = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        val keyPos   = "${currentProfile}_movie_resume_${streamId}_pos"
-        val keyDur   = "${currentProfile}_movie_resume_${streamId}_dur"
-        val pos      = prefs.getLong(keyPos, 0L)
-        val totalDur = prefs.getLong(keyDur, 0L)
+    val prefs    = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+    val keyPos   = "${currentProfile}_movie_resume_${streamId}_pos"
+    val keyDur   = "${currentProfile}_movie_resume_${streamId}_dur"
+    val pos      = prefs.getLong(keyPos, 0L)
+    val totalDur = prefs.getLong(keyDur, 0L)
 
-        // Verifica se tem mais de 30 segundos e se a duração total é válida
-        if (pos >= 30_000L && totalDur > 0) {
-            btnPlay.text = "▶  CONTINUAR"
-            btnRestartAction?.visibility = View.VISIBLE
-            layoutProgress?.visibility = View.VISIBLE
+    if (pos >= 30_000L && totalDur > 0) {
+        btnPlay.text = "▶  CONTINUAR"
+        btnRestartAction?.visibility = View.VISIBLE
+        layoutProgress?.visibility = View.VISIBLE
 
-            // CÁLCULO CRONOMETRADO:
-            // Multiplicamos por 100 antes de dividir para manter precisão em Long
-            val progressPercent = ((pos * 100) / totalDur).toInt()
-            progressBarMovie?.progress = progressPercent
+        // CÁLCULO PRECISO: 
+        // Multiplicamos a posição atual por 100 ANTES de dividir pela duração total.
+        // Isso garante que o resultado seja um número entre 1 e 100.
+        val progressPercent = ((pos * 100) / totalDur).toInt()
+        progressBarMovie?.progress = progressPercent
 
-            val assistidoMin = TimeUnit.MILLISECONDS.toMinutes(pos)
-            val restMs   = totalDur - pos
-            val horasRest = TimeUnit.MILLISECONDS.toHours(restMs)
-            val minRest   = TimeUnit.MILLISECONDS.toMinutes(restMs) % 60
+        val assistidoMin = TimeUnit.MILLISECONDS.toMinutes(pos)
+        val restMs   = totalDur - pos
+        val horasRest = TimeUnit.MILLISECONDS.toHours(restMs)
+        val minRest   = TimeUnit.MILLISECONDS.toMinutes(restMs) % 60
 
-            tvTimeRemaining?.text = if (horasRest > 0) {
-                "${assistidoMin}min assistido  •  Faltam ${horasRest}h${minRest}min"
-            } else {
-                "${assistidoMin}min assistido  •  Faltam ${minRest}min"
-            }
+        tvTimeRemaining?.text = if (horasRest > 0) {
+            "${assistidoMin}min assistido  •  Faltam ${horasRest}h${minRest}min"
         } else {
-            btnPlay.text                 = "▶  ASSISTIR"
-            btnRestartAction?.visibility = View.GONE
-            layoutProgress?.visibility   = View.GONE
-            btnResume.visibility         = View.GONE
+            "${assistidoMin}min assistido  •  Faltam ${minRest}min"
         }
+    } else {
+        btnPlay.text                 = "▶  ASSISTIR"
+        btnRestartAction?.visibility = View.GONE
+        layoutProgress?.visibility   = View.GONE
+        btnResume.visibility         = View.GONE
     }
+}
 
     // ✅ ADICIONADO: Função para resolver o erro "Unresolved reference: getResumeProgress"
     private fun getResumeProgress() {
