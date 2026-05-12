@@ -268,7 +268,6 @@ class DetailsActivity : AppCompatActivity() {
         restaurarEstadoDownload()
     }
 
-    // ✅ LÓGICA DO BOTÃO CONTINUAR E BARRA DE PROGRESSO VERMELHA
     private fun verificarResume() {
         val prefs    = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         val keyPos   = "${currentProfile}_movie_resume_${streamId}_pos"
@@ -277,18 +276,20 @@ class DetailsActivity : AppCompatActivity() {
         val totalDur = prefs.getLong(keyDur, 0L)
 
         if (pos >= 30_000L && totalDur > 0) {
-            btnPlay.text = "▶  CONTINUAR"
+            // MOSTRAR BOTÃO CONTINUAR E ESCONDER ASSISTIR
+            btnPlay.visibility = View.GONE
+            btnResume.visibility = View.VISIBLE
+            btnResume.requestFocus()
+
             btnRestartAction?.visibility = View.VISIBLE
             layoutProgress?.visibility = View.VISIBLE
 
-            // Define a cor da barra para VERMELHO
+            // Barra de progresso vermelha
             progressBarMovie?.progressTintList = ColorStateList.valueOf(Color.RED)
-
-            // Cálculo preciso da barra de progresso (0 a 100)
             val progressPercent = ((pos * 100) / totalDur).toInt()
             progressBarMovie?.progress = progressPercent
 
-            // Formatação do tempo
+            // Tempo formatado
             val assistidoMin = TimeUnit.MILLISECONDS.toMinutes(pos)
             val restMs   = totalDur - pos
             val horasRest = TimeUnit.MILLISECONDS.toHours(restMs)
@@ -300,10 +301,12 @@ class DetailsActivity : AppCompatActivity() {
                 "${assistidoMin}min assistido  •  Faltam ${minRest}min"
             }
         } else {
-            btnPlay.text                 = "▶  ASSISTIR"
+            // VOLTAR PARA ESTADO PADRÃO (ASSISTIR)
+            btnPlay.visibility = View.VISIBLE
+            btnPlay.text = "▶  ASSISTIR"
+            btnResume.visibility = View.GONE
             btnRestartAction?.visibility = View.GONE
             layoutProgress?.visibility   = View.GONE
-            btnResume.visibility         = View.GONE
         }
     }
 
@@ -545,20 +548,14 @@ class DetailsActivity : AppCompatActivity() {
             }
         }
         btnPlay.onFocusChangeListener    = focusListener
+        btnResume.onFocusChangeListener  = focusListener
         btnFavorite.onFocusChangeListener = focusListener
+        btnRestartAction?.onFocusChangeListener = focusListener
 
         btnFavorite.setOnClickListener        { toggleFavorite() }
         btnFavoriteLayout?.setOnClickListener { toggleFavorite() }
 
-        btnPlay.setOnClickListener {
-            val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-            val pos = prefs.getLong("${currentProfile}_movie_resume_${streamId}_pos", 0L)
-            if (pos >= 30_000L) {
-                abrirPlayer(usarResume = true)
-            } else {
-                abrirPlayer(usarResume = false)
-            }
-        }
+        btnPlay.setOnClickListener { abrirPlayer(usarResume = false) }
 
         btnResume.setOnClickListener { abrirPlayer(usarResume = true) }
 
@@ -566,7 +563,12 @@ class DetailsActivity : AppCompatActivity() {
             AlertDialog.Builder(this)
                 .setTitle("Reiniciar")
                 .setMessage("Deseja assistir desde o início?")
-                .setPositiveButton("Sim") { _, _ -> abrirPlayer(usarResume = false) }
+                .setPositiveButton("Sim") { _, _ -> 
+                    // Limpar progresso antes de reiniciar
+                    val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+                    prefs.edit().remove("${currentProfile}_movie_resume_${streamId}_pos").apply()
+                    abrirPlayer(usarResume = false) 
+                }
                 .setNegativeButton("Não", null)
                 .show()
         }
