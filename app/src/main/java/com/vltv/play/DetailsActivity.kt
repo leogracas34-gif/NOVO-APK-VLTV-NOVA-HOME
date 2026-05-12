@@ -56,7 +56,6 @@ class DetailsActivity : AppCompatActivity() {
 
     private var serverYoutubeTrailer: String? = null
     private var currentProfile: String = "Padrao"
-    private var savedPosition: Long = 0L
 
     private lateinit var imgPoster: ImageView
     private lateinit var tvTitle: TextView
@@ -270,41 +269,38 @@ class DetailsActivity : AppCompatActivity() {
     }
 
     private fun verificarResume() {
-        CoroutineScope(Dispatchers.IO).launch {
-            val db = AppDatabase.getDatabase(applicationContext).streamDao()
-            val progresso = db.getResumeProgress(streamId, currentProfile)
+        val prefs    = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        val keyPos   = "${currentProfile}_movie_resume_${streamId}_pos"
+        val keyDur   = "${currentProfile}_movie_resume_${streamId}_dur"
+        val pos      = prefs.getLong(keyPos, 0L)
+        val totalDur = prefs.getLong(keyDur, 0L)
 
-            withContext(Dispatchers.Main) {
-                if (progresso != null && progresso.position >= 30_000L && progresso.duration > 0) {
-                    savedPosition = progresso.position
-                    btnPlay.text = "▶  CONTINUAR"
-                    btnRestartAction?.visibility = View.VISIBLE
-                    layoutProgress?.visibility = View.VISIBLE
-
-                    val pos = progresso.position
-                    val totalDur = progresso.duration
-                    val progressPercent = ((pos.toFloat() / totalDur.toFloat()) * 100).toInt()
-                    progressBarMovie?.progress = progressPercent
-
-                    val assistidoMin = TimeUnit.MILLISECONDS.toMinutes(pos)
-                    val restMs = totalDur - pos
-                    val horasRest = TimeUnit.MILLISECONDS.toHours(restMs)
-                    val minRest = TimeUnit.MILLISECONDS.toMinutes(restMs) % 60
-
-                    tvTimeRemaining?.text = if (horasRest > 0) {
-                        "${assistidoMin}min assistido  •  Faltam ${horasRest}h${minRest}min"
-                    } else {
-                        "${assistidoMin}min assistido  •  Faltam ${minRest}min"
-                    }
-                } else {
-                    savedPosition = 0L
-                    btnPlay.text = "▶  ASSISTIR"
-                    btnRestartAction?.visibility = View.GONE
-                    layoutProgress?.visibility = View.GONE
-                    btnResume.visibility = View.GONE
-                }
+        if (pos >= 30_000L && totalDur > 0) {
+            btnPlay.text = "▶  CONTINUAR"
+            btnRestartAction?.visibility = View.VISIBLE
+            layoutProgress?.visibility = View.VISIBLE
+            val progressPercent = ((pos.toFloat() / totalDur.toFloat()) * 100).toInt()
+            progressBarMovie?.progress = progressPercent
+            val assistidoMin = TimeUnit.MILLISECONDS.toMinutes(pos)
+            val restMs   = totalDur - pos
+            val horasRest = TimeUnit.MILLISECONDS.toHours(restMs)
+            val minRest   = TimeUnit.MILLISECONDS.toMinutes(restMs) % 60
+            tvTimeRemaining?.text = if (horasRest > 0) {
+                "${assistidoMin}min assistido  •  Faltam ${horasRest}h${minRest}min"
+            } else {
+                "${assistidoMin}min assistido  •  Faltam ${minRest}min"
             }
+        } else {
+            btnPlay.text                 = "▶  ASSISTIR"
+            btnRestartAction?.visibility = View.GONE
+            layoutProgress?.visibility   = View.GONE
+            btnResume.visibility         = View.GONE
         }
+    }
+
+    // ✅ ADICIONADO: Função para resolver o erro "Unresolved reference: getResumeProgress"
+    private fun getResumeProgress() {
+        verificarResume()
     }
 
     private fun iniciarMonitoramentoUI() {
@@ -551,16 +547,22 @@ class DetailsActivity : AppCompatActivity() {
         btnFavoriteLayout?.setOnClickListener { toggleFavorite() }
 
         btnPlay.setOnClickListener {
-            abrirPlayer(savedPosition)
+            val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+            val pos = prefs.getLong("${currentProfile}_movie_resume_${streamId}_pos", 0L)
+            if (pos >= 30_000L) {
+                abrirPlayer(usarResume = true)
+            } else {
+                abrirPlayer(usarResume = false)
+            }
         }
 
-        btnResume.setOnClickListener { abrirPlayer(savedPosition) }
+        btnResume.setOnClickListener { abrirPlayer(usarResume = true) }
 
         btnRestartAction?.setOnClickListener {
             AlertDialog.Builder(this)
                 .setTitle("Reiniciar")
                 .setMessage("Deseja assistir desde o início?")
-                .setPositiveButton("Sim") { _, _ -> abrirPlayer(0L) }
+                .setPositiveButton("Sim") { _, _ -> abrirPlayer(usarResume = false) }
                 .setNegativeButton("Não", null)
                 .show()
         }
@@ -619,7 +621,14 @@ class DetailsActivity : AppCompatActivity() {
         saveFavMovies(this, favs)
     }
 
-    private fun abrirPlayer(posicao: Long) {
+    private fun abrirPlayer(usarResume: Boolean) {
+        val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
+        val posicao = if (usarResume) {
+            prefs.getLong("${currentProfile}_movie_resume_${streamId}_pos", 0L)
+        } else {
+            0L
+        }
+
         val intent = Intent(this, PlayerActivity::class.java).apply {
             putExtra("stream_id",        streamId)
             putExtra("stream_type",      if (isSeries) "series" else "movie")
