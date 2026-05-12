@@ -750,7 +750,11 @@ class SeriesDetailsActivity : AppCompatActivity() {
                 btnResume.visibility = View.VISIBLE
                 btnRestartAction?.visibility = View.VISIBLE
                 layoutProgress?.visibility = View.VISIBLE
-                progressBarSeries?.progress = ((maxPos.toFloat() / maxDur.toFloat()) * 100).toInt()
+                
+                // CÁLCULO CRONOMETRADO: Multiplicamos por 100 ANTES da divisão
+                val progressPercent = ((maxPos * 100) / maxDur).toInt()
+                progressBarSeries?.progress = progressPercent
+                
                 val restMs = maxDur - maxPos
                 tvTimeRemaining?.text = "Restam ${TimeUnit.MILLISECONDS.toHours(restMs)}h${TimeUnit.MILLISECONDS.toMinutes(restMs) % 60}min"
             } else {
@@ -805,10 +809,13 @@ class SeriesDetailsActivity : AppCompatActivity() {
             val prefs = holder.itemView.context.getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
             val pos = prefs.getLong("${profile}_series_resume_${epId}_pos", 0)
             val dur = prefs.getLong("${profile}_series_resume_${epId}_dur", 0)
-            if (pos > 0 && dur > 0) {
-                val pct = ((pos.toFloat() / dur.toFloat()) * 100).toInt()
+            
+            if (pos >= 30000L && dur > 0) {
                 holder.pbEpisodeProgress?.visibility = View.VISIBLE
-                holder.pbEpisodeProgress?.progress = pct
+                
+                // CÁLCULO CRONOMETRADO: Multiplicamos por 100 ANTES da divisão
+                val progressPercent = ((pos * 100) / dur).toInt()
+                holder.pbEpisodeProgress?.progress = progressPercent
             } else {
                 holder.pbEpisodeProgress?.visibility = View.GONE
             }
