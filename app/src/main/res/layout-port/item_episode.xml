@@ -19,7 +19,6 @@
         android:padding="10dp"
         android:gravity="center_vertical">
 
-        <!-- Thumbnail do episódio com gradiente e play icon -->
         <FrameLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content">
@@ -35,7 +34,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent">
 
-                    <!-- Thumbnail HD -->
                     <ImageView
                         android:id="@+id/imgEpisodeThumb"
                         android:layout_width="match_parent"
@@ -43,13 +41,11 @@
                         android:scaleType="centerCrop"
                         android:src="@android:color/darker_gray"/>
 
-                    <!-- Gradiente escuro sobre thumbnail -->
                     <View
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:background="@drawable/gradient_episode_thumb"/>
 
-                    <!-- Ícone play centralizado -->
                     <ImageView
                         android:layout_width="30dp"
                         android:layout_height="30dp"
@@ -58,17 +54,17 @@
                         android:alpha="0.85"
                         android:contentDescription="Play"/>
 
-                    <!-- Barra de progresso na base -->
                     <ProgressBar
                         android:id="@+id/pbEpisodeProgress"
                         style="?android:attr/progressBarStyleHorizontal"
                         android:layout_width="match_parent"
                         android:layout_height="3dp"
                         android:layout_gravity="bottom"
-                        android:progressDrawable="@drawable/progress_horizontal_disney"
                         android:progressBackgroundTint="#44FFFFFF"
+                        android:progressTint="#FF0000"
                         android:progress="0"
                         android:max="100"
+                        android:indeterminate="false"
                         android:visibility="gone"/>
 
                 </FrameLayout>
@@ -77,7 +73,6 @@
 
         </FrameLayout>
 
-        <!-- Informações do episódio -->
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
@@ -86,7 +81,6 @@
             android:layout_marginStart="12dp"
             android:layout_marginEnd="6dp">
 
-            <!-- Número e título -->
             <TextView
                 android:id="@+id/tvEpisodeTitle"
                 android:layout_width="match_parent"
@@ -99,7 +93,6 @@
                 android:ellipsize="end"
                 android:letterSpacing="0.01"/>
 
-            <!-- Sinopse -->
             <TextView
                 android:id="@+id/tvEpisodePlot"
                 android:layout_width="match_parent"
@@ -114,7 +107,6 @@
 
         </LinearLayout>
 
-        <!-- Botão download (escondido por padrão) -->
         <LinearLayout
             android:id="@+id/btnDownloadEpisode"
             android:layout_width="38dp"
