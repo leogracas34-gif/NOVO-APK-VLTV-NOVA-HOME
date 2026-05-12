@@ -125,23 +125,25 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
-                    <ProgressBar
-                        android:id="@+id/progressBarMovie"
-                        style="?android:attr/progressBarStyleHorizontal"
-                        android:layout_width="0dp"
-                        android:layout_height="4dp"
-                        android:layout_weight="1"
-                        android:progressDrawable="@drawable/progress_horizontal_disney"
-                        android:progressBackgroundTint="#33FFFFFF"
-                        android:progress="0"/>
+                <ProgressBar
+                    android:id="@+id/progressBarMovie"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="0dp"
+                    android:layout_height="4dp"
+                    android:layout_weight="1"
+                    android:progress="0"
+                    android:max="100"
+                    android:progressTint="#FF0000"
+                    android:progressBackgroundTint="#44FFFFFF"
+                    android:indeterminate="false"/>
 
-                    <TextView
-                        android:id="@+id/tvTimeRemaining"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:textColor="#88FFFFFF"
-                        android:textSize="10sp"/>
+                <TextView
+                    android:id="@+id/tvTimeRemaining"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textColor="#88FFFFFF"
+                    android:textSize="10sp"/>
                 </LinearLayout>
 
                 <LinearLayout
